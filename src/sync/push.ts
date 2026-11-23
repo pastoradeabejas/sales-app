@@ -84,7 +84,7 @@ export async function pushOutbox({ gh, store, deviceName }: SyncDeps): Promise<P
         if (r.toast) sum.toasts.push(await conflictToast(type, r.merged, lookup));
         if (r.dropOutbox) {
           await store.applyRemote(type, r.merged, { path, blobSha: remote.sha, recordType: type, recordId: id });
-          await store.dropOutboxFor(path);
+          await store.dropOutboxEntry(seq);
           return null;
         }
         // Keep the old files row until the merged version is pushed, so a give-up re-merges next time.

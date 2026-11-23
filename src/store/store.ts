@@ -176,6 +176,12 @@ export function createStore(backend: Backend, opts: StoreOptions = {}) {
         for (const e of await t.getAllByIndex<OutboxEntry>('outbox', 'path', path)) await t.delete('outbox', e.seq!);
       }),
 
+    /** Drops one entry (the one that lost a merge); later edits of the same path stay queued. */
+    dropOutboxEntry: (seq: number) => {
+      inFlight.delete(seq);
+      return write(['outbox'], (t) => t.delete('outbox', seq)).then(() => undefined);
+    },
+
     /** Known remote files by path. */
     files: async () => new Map((await read(['files'], (t) => t.getAll<FileEntry>('files'))).map((f) => [f.path, f])),
     /** Stores one files row. */

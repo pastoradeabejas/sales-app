@@ -153,6 +153,18 @@ describe('store: write path and outbox', () => {
     await store.dropOutboxFor(path);
     expect((await store.outbox()).map((e) => e.path)).toEqual(['clients/c2.json']);
   });
+
+  it('dropOutboxEntry keeps an edit saved while that entry was being pushed', async () => {
+    const { store } = setup();
+    await store.save('client', marta, path);
+    const [first] = await store.outbox();
+    store.markInFlight(first.seq!);
+    await store.save('client', { ...marta, name: 'Marta R.' });
+    await store.dropOutboxEntry(first.seq!);
+    const left = await store.outbox();
+    expect(left).toHaveLength(1);
+    expect(left[0].content).toMatchObject({ name: 'Marta R.' });
+  });
 });
 
 describe('store: sync helpers', () => {

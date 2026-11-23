@@ -69,7 +69,7 @@ export async function pull({ gh, store, now }: SyncDeps, onProgress?: (done: num
       return;
     }
     const r = resolvePending(entry.content, remoteRecord, type);
-    if (r.dropOutbox) await store.dropOutboxFor(path);
+    if (r.dropOutbox) await store.dropOutboxEntry(entry.seq!);
     // A kept entry keeps the old blob SHA: its push then conflicts and merges with the remote (§6.2).
     await store.applyRemote(type, r.merged, r.dropOutbox ? file : (files.get(path) ?? file));
     if (r.toast) toasts.push(await conflictToast(type, r.merged, lookup));
