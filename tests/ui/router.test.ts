@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseRoute, tabOf } from '../../src/ui/router.ts';
+import { parseQuery, parseRoute, tabOf } from '../../src/ui/router.ts';
 
 describe('parseRoute', () => {
   it.each([
@@ -56,5 +56,16 @@ describe('tabOf', () => {
     ['product', 'products'],
   ] as const)('%s is in the %s tab', (name, tab) => {
     expect(tabOf(name)).toBe(tab);
+  });
+});
+
+describe('parseQuery', () => {
+  it('reads the query part of a hash', () => {
+    expect(parseQuery('#/stock/transform?input=milk1&recipe=r%201')).toEqual({ input: 'milk1', recipe: 'r 1' });
+  });
+
+  it('is empty without a query', () => {
+    expect(parseQuery('#/orders')).toEqual({});
+    expect(parseQuery('')).toEqual({});
   });
 });
