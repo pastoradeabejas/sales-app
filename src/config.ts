@@ -6,6 +6,7 @@ export const config = {
   description: 'Offline-first bookkeeping for sales, clients, payments and stock.',
   themeColor: '#2457C5',
   backgroundColor: '#F4F5F7',
+  iconBackground: '#FFF4D6',
 } as const;
 
 export type AppConfig = typeof config;
