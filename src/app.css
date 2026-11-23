@@ -35,6 +35,7 @@
 
   --tap: 44px;
   --nav-h: 68px;
+  --sidebar-w: 220px;
 }
 
 :root[data-theme='dark'] {
@@ -316,4 +317,25 @@ textarea.input {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/* Wide layout (Mac, ≥ 900 px): sidebar on the left, content centred. */
+@media (min-width: 900px) {
+  body {
+    padding-left: var(--sidebar-w);
+  }
+  #app > main {
+    max-width: 920px;
+    margin: 0 auto;
+  }
+  .sticky-footer {
+    left: var(--sidebar-w);
+  }
+  .page.two-col {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+  .page.two-col > .span-2 {
+    grid-column: 1 / -1;
+  }
 }
