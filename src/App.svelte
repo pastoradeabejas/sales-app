@@ -1,5 +1,6 @@
 <script lang="ts">
   import BottomNav from './ui/components/BottomNav.svelte';
+  import UpdateBanner from './ui/components/UpdateBanner.svelte';
   import Fab from './ui/components/Fab.svelte';
   import Placeholder from './ui/screens/Placeholder.svelte';
   import Settings from './ui/screens/Settings.svelte';
@@ -41,6 +42,7 @@
 
 {#if fab}<Fab />{/if}
 <BottomNav active={tabOf(name)} />
+<UpdateBanner />
 
 <style>
   main {
