@@ -3,10 +3,13 @@
   import Header from '../../components/Header.svelte';
   import Icon from '../../components/Icon.svelte';
   import Tag from '../../components/Tag.svelte';
+  import type { Recipe } from '../../../core/types.ts';
   import { formatAmount } from '../../../core/quantity.ts';
   import { isLowStock, sellRate } from '../../../core/stock.ts';
-  import { app, localDate, view } from '../../data.svelte.ts';
-  import { daysLeftText, lastMovementText, recentMovements, transformSummary } from './logic.ts';
+  import { app, localDate, saveRecipe, view } from '../../data.svelte.ts';
+  import { showToast } from '../../toast.svelte.ts';
+  import { activeRecipes, daysLeftText, lastMovementText, recentMovements, recipeNameError, transformSummary } from './logic.ts';
+  import RecipeSheet from './RecipeSheet.svelte';
 
   const today = localDate();
   const classes = $derived(app.products.filter((c) => c.trackStock && !c.archived).sort((a, b) => a.name.localeCompare(b.name)));
@@ -24,7 +27,24 @@
     }),
   );
   const recent = $derived(recentMovements(app.orders, app.stock, app.recipes, view.classesById, today));
-  const recipes = $derived(app.recipes.filter((r) => !r.archived).sort((a, b) => a.name.localeCompare(b.name)));
+  const recipes = $derived(activeRecipes(app.recipes));
+  const archived = $derived(app.recipes.filter((r) => r.archived).sort((a, b) => a.name.localeCompare(b.name)));
+  let showArchived = $state(false);
+  let sheetOpen = $state(false);
+  let editing = $state<Recipe | null>(null);
+  function openSheet(r: Recipe | null) {
+    editing = r;
+    sheetOpen = true;
+  }
+  async function restore(r: Recipe) {
+    if (recipeNameError(r.name, app.recipes, r.id)) {
+      showToast(`Rename first: another recipe is called ${r.name}`);
+      openSheet(r);
+      return;
+    }
+    await saveRecipe({ ...r, archived: false });
+    showToast(`Restored ${r.name}`);
+  }
   const icons = { add: 'plus', remove: 'minus', transform: 'transform', sale: 'orders' } as const;
 </script>
 
@@ -85,7 +105,7 @@
   <section class="card">
     <div class="section-head">
       <h2>Recipes</h2>
-      <a class="btn-ghost new" href="#/stock/transform">+ New</a>
+      <button type="button" class="btn-ghost new" onclick={() => openSheet(null)}>+ New</button>
     </div>
     <div class="list">
       {#each recipes as r (r.id)}
@@ -94,14 +114,35 @@
             <span class="title">{r.name}</span>
             <span class="muted">{transformSummary(r.inputs, r.outputs, view.classesById)}</span>
           </span>
+          <button type="button" class="edit" aria-label="Edit {r.name}" onclick={() => openSheet(r)}>Edit</button>
           <a class="use" href="#/stock/transform?recipe={r.id}" aria-label="Use {r.name}">Use</a>
         </div>
       {:else}
         <p class="muted">No recipes yet. Tick "Save as recipe" on a transform to keep one.</p>
       {/each}
     </div>
+    {#if archived.length}
+      <button type="button" class="btn-ghost toggle" aria-expanded={showArchived} onclick={() => (showArchived = !showArchived)}>
+        {showArchived ? 'Hide' : 'Show'} archived recipes ({archived.length})
+      </button>
+      {#if showArchived}
+        <div class="list">
+          {#each archived as r (r.id)}
+            <div class="list-row">
+              <span class="grow">
+                <span class="title">{r.name}</span>
+                <span class="muted">{transformSummary(r.inputs, r.outputs, view.classesById)}</span>
+              </span>
+              <button type="button" class="edit" aria-label="Restore {r.name}" onclick={() => restore(r)}>Restore</button>
+            </div>
+          {/each}
+        </div>
+      {/if}
+    {/if}
   </section>
 </div>
+
+<RecipeSheet bind:open={sheetOpen} recipe={editing} />
 
 <style>
   h2,
@@ -207,6 +248,20 @@
     align-items: center;
     font-weight: 600;
     text-decoration: none;
+  }
+  .toggle {
+    min-height: var(--tap);
+    font-weight: 600;
+    padding: 0;
+  }
+  .edit {
+    min-height: var(--tap);
+    padding: 0 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--ink);
+    font-weight: 600;
   }
   .use {
     min-height: var(--tap);
