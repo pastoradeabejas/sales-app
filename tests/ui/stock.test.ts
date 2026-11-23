@@ -286,10 +286,11 @@ describe('chartModel', () => {
   it('null without movements', () => {
     expect(chartModel([], '2026-11-22')).toBeNull();
   });
-  it('step line from 0 through the balance of each day, extended to today', () => {
+  it('step line from the first day balance through each day, extended to today', () => {
     const m = chartModel(t, '2026-11-30', 200, 100, 10)!;
     // days 10 → 30 Nov = 20 days over 200 px; balances 0..2,000,000 over y 90..10.
-    expect(m.points).toEqual([[0, 90], [0, 50], [50, 50], [50, 90], [100, 90], [100, 10], [200, 10]]);
+    // No rise from 0 before the first day: the line starts at the first balance (user review).
+    expect(m.points).toEqual([[0, 50], [50, 50], [50, 90], [100, 90], [100, 10], [200, 10]]);
     expect(m.markers).toEqual([
       { x: 0, y: 50, kind: 'add' },
       { x: 50, y: 90, kind: 'transform' },

@@ -289,8 +289,8 @@ export function chartModel(timeline: Movement[], today: string, w = 340, h = 120
   const r1 = (v: number) => Math.round(v * 10) / 10;
   const x = (date: string) => (span ? r1(((dayNumber(date) - dayNumber(first)) / span) * w) : 0);
   const y = (v: Scaled) => r1(h - pad - ((v - min) / (max - min)) * (h - 2 * pad));
-  const points: [number, number][] = [[0, y(0)]];
-  for (const d of days) {
+  const points: [number, number][] = [[x(days[0].date), y(days[0].balance)]];
+  for (const d of days.slice(1)) {
     const px = x(d.date);
     points.push([px, points[points.length - 1][1]], [px, y(d.balance)]);
   }

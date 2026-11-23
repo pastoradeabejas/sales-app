@@ -7,9 +7,10 @@
   // Stock level over time (§8.12): hand-built SVG step line with add and transform markers.
   let { cls, timeline, today }: { cls: ProductClass; timeline: Movement[]; today: string } = $props();
 
-  const W = 340;
-  const H = 120;
-  const m = $derived(chartModel(timeline, today, W, H));
+  // Drawn at the real pixel width so markers keep their size on any screen.
+  let W = $state(340);
+  const H = 140;
+  const m = $derived(chartModel(timeline, today, W || 340, H));
   const fmt = (v: number) => formatAmount(v, cls.unit.decimals, cls.unit.name);
   const label = $derived(
     m
@@ -19,14 +20,14 @@
 </script>
 
 {#if m}
-  <figure>
-    <svg viewBox="0 0 {W} {H}" width="100%" role="img" aria-label={label}>
+  <figure bind:clientWidth={W}>
+    <svg viewBox="0 0 {W || 340} {H}" width="100%" role="img" aria-label={label}>
       <line class="base" x1="0" x2={W} y1={m.y(0)} y2={m.y(0)} />
       <line class="grid" x1="0" x2={W} y1={m.y(m.max)} y2={m.y(m.max)} />
       <polyline class="line" points={m.points.map((p) => p.join(',')).join(' ')} />
       {#each m.markers as k, i (i)}
         {#if k.kind === 'add'}
-          <circle class="add" cx={k.x} cy={k.y} r="4.5" />
+          <circle class="add" cx={k.x} cy={k.y} r="4" />
         {:else}
           <rect class="tr" x={k.x - 4} y={k.y - 4} width="8" height="8" transform="rotate(45 {k.x} {k.y})" />
         {/if}
