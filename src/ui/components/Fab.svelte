@@ -7,14 +7,14 @@
 <style>
   a {
     position: fixed;
-    right: 16px;
+    right: 20px;
     bottom: calc(var(--nav-h) + 16px + env(safe-area-inset-bottom));
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    min-height: 52px;
-    padding: 0 20px;
-    border-radius: 999px;
+    min-height: 56px;
+    padding: 0 22px;
+    border-radius: 18px;
     background: var(--accent);
     color: var(--on-accent);
     font-weight: 600;

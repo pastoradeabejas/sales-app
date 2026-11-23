@@ -16,7 +16,7 @@
 <nav aria-label="Main">
   {#each tabs as { tab, label } (tab)}
     <a href="#/{tab}" aria-current={tab === active ? 'page' : undefined}>
-      <Icon name={tab} />
+      <Icon name={tab} size={22} />
       <span>{label}</span>
     </a>
   {/each}
@@ -41,7 +41,7 @@
     gap: 2px;
     min-height: var(--tap);
     color: var(--muted);
-    font-size: 12px;
+    font-size: 11px;
     text-decoration: none;
   }
   a[aria-current='page'] {
