@@ -9,5 +9,10 @@ coverage/
 .DS_Store
 .vscode/*
 !.vscode/extensions.json
-# methodology document, kept out of the public repo (D-005)
-ClaudeSetup-v2.1.pdf
+# Project documents stay local, never pushed: only app files are tracked (D-008)
+/*.md
+!/README.md
+/design/
+/knowledge/
+/.claude/
+*.pdf
