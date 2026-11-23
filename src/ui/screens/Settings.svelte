@@ -5,7 +5,8 @@
   import { app, clearDevice, startDemo } from '../data.svelte.ts';
   import { startSync, stopSync } from '../sync.svelte.ts';
   import { go } from '../router.svelte.ts';
-  import { appearance, setThemePref } from '../theme.svelte.ts';
+  import { appearance, setTextScale, setThemePref } from '../theme.svelte.ts';
+  import { TEXT_SCALE } from '../textSize.ts';
   import type { ThemePref } from '../theme.ts';
   import { isConfigured } from '../../store/settings.ts';
   import Backup from './settings/Backup.svelte';
@@ -63,6 +64,25 @@
   <section class="card stack">
     <h2>Appearance</h2>
     <Segmented options={themes} bind:value={theme} label="Appearance" onchange={setThemePref} />
+    <div class="field">
+      <label for="text-size">Text size: {Math.round(appearance.textScale * 100)} %</label>
+      <div class="size-row">
+        <span class="small-a" aria-hidden="true">A</span>
+        <input
+          id="text-size"
+          type="range"
+          min={TEXT_SCALE.min}
+          max={TEXT_SCALE.max}
+          step={TEXT_SCALE.step}
+          value={appearance.textScale}
+          oninput={(e) => setTextScale(Number(e.currentTarget.value))}
+        />
+        <span class="big-a" aria-hidden="true">A</span>
+      </div>
+      {#if appearance.textScale !== 1}
+        <button type="button" class="btn btn-ghost reset" onclick={() => setTextScale(1)}>Reset to 100 %</button>
+      {/if}
+    </div>
   </section>
 
   <section class="card">
@@ -83,6 +103,29 @@
 </ConfirmSheet>
 
 <style>
+  .size-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: var(--tap);
+  }
+  .size-row input {
+    flex: 1;
+    accent-color: var(--accent);
+    min-height: var(--tap);
+  }
+  .small-a {
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .big-a {
+    font-size: 22px;
+    font-weight: 600;
+  }
+  .reset {
+    justify-self: start;
+    padding: 0;
+  }
   .stack {
     display: grid;
     gap: 12px;
