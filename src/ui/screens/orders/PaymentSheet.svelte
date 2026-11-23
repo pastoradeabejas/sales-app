@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AmountChips from './AmountChips.svelte';
   import Segmented from '../../components/Segmented.svelte';
   import Sheet from '../../components/Sheet.svelte';
   import { formatMoney, parseMoney } from '../../../core/money.ts';
@@ -57,6 +58,7 @@
     <div class="field">
       <label for="pay-amount">Amount €</label>
       <input id="pay-amount" class="input" inputmode="decimal" autocomplete="off" bind:value={text} placeholder="0.00" />
+      <AmountChips {owed} amount={amount ?? null} onset={(c) => (text = (c / 100).toFixed(2))} />
       {#if amount && amount > owed}
         <p class="hint credit-text">{formatMoney(amount - owed)} will be kept as credit</p>
       {/if}

@@ -5,6 +5,7 @@
   import { addPayment, app, localDate, newPayment, view } from '../../data.svelte.ts';
   import Segmented from '../../components/Segmented.svelte';
   import Sheet from '../../components/Sheet.svelte';
+  import AmountChips from '../orders/AmountChips.svelte';
   import { receiveDefaults, shortDate } from './logic.ts';
 
   // Receive payment (unlinked, orderId null). Also used for "Mark all paid" via `fixed`.
@@ -46,6 +47,7 @@
   <div class="field">
     <label for="rs-amount">Amount received (€)</label>
     <input id="rs-amount" class="input" inputmode="decimal" bind:value={text} readonly={fixed} />
+    {#if !fixed}<AmountChips {owed} amount={amount > 0 ? amount : null} onset={(c) => (text = (c / 100).toFixed(2))} />{/if}
     {#if owed > 0 && !fixed}<p class="hint">{client.name} owes {formatMoney(owed)}. You can enter more.</p>{/if}
   </div>
   <div class="field">

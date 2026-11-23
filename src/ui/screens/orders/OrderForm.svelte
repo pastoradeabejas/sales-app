@@ -3,6 +3,7 @@
   import ConfirmSheet from '../../components/ConfirmSheet.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import Header from '../../components/Header.svelte';
+  import Sheet from '../../components/Sheet.svelte';
   import Segmented from '../../components/Segmented.svelte';
   import StatusTag from '../../components/StatusTag.svelte';
   import { formatMoney, parseMoney } from '../../../core/money.ts';
@@ -18,6 +19,7 @@
   import ClientPicker from './ClientPicker.svelte';
   import StartFrom from './StartFrom.svelte';
   import VariantRow from './VariantRow.svelte';
+  import { dateButtonLabel } from './polish.ts';
   import {
     creditMoved,
     draftFromOrder,
@@ -56,6 +58,7 @@
   let warnOpen = $state(false);
   let warnText = $state('');
   let busy = $state(false);
+  let dateOpen = $state(false);
 
   const client = $derived(view.clientsById.get(clientId));
   const picks = $derived(clientId ? startFromPicks(app.orders, clientId) : []);
@@ -155,7 +158,15 @@
   }
 </script>
 
-<Header title={prev ? 'Edit order' : 'New order'} back={prev ? `#/orders/${prev.id}` : '#/orders'} />
+<Header title={prev ? 'Edit order' : 'New order'} back={prev ? `#/orders/${prev.id}` : '#/orders'}>
+  {#snippet actions()}
+    {#if step === 'form' && !missing}
+      <button type="button" class="btn date-btn" aria-label="Order date" onclick={() => (dateOpen = true)}>
+        {dateButtonLabel(date, today)}
+      </button>
+    {/if}
+  {/snippet}
+</Header>
 
 {#if missing}
   <div class="page">
@@ -193,12 +204,6 @@
       </button>
     {/if}
     {#if skipped.length}<p class="warning">{skippedNote(skipped)}</p>{/if}
-
-    <div class="field">
-      <label for="order-date">Date</label>
-      <input id="order-date" class="input" type="date" bind:value={date} />
-      {#if isFutureDate(date, today)}<p class="warning">This date is in the future.</p>{/if}
-    </div>
 
     {#if groups.length === 0}
       <EmptyState title="No products to sell">
@@ -266,11 +271,27 @@
   </footer>
 {/if}
 
+<Sheet bind:open={dateOpen} title="Order date">
+  <div class="field">
+    <label for="order-date">Date</label>
+    <input id="order-date" class="input" type="date" bind:value={date} />
+    {#if isFutureDate(date, today)}<p class="warning">This date is in the future.</p>{/if}
+  </div>
+  {#snippet footer()}
+    <button type="button" class="btn btn-primary btn-block" onclick={() => (dateOpen = false)}>Done</button>
+  {/snippet}
+</Sheet>
+
 <ConfirmSheet bind:open={warnOpen} title="Stock below zero" confirmLabel="Save anyway" onconfirm={() => save(true)}>
   <p>{warnText}</p>
 </ConfirmSheet>
 
 <style>
+  .date-btn {
+    min-height: var(--tap);
+    font-size: var(--fs-small);
+    white-space: nowrap;
+  }
   .client {
     display: flex;
     align-items: center;
