@@ -47,7 +47,8 @@
       Tap a point for details.
     {/if}
   </p>
-  <table class="visually-hidden">
+  <div class="visually-hidden">
+    <table>
     <caption>{label}</caption>
     <thead><tr><th>Period</th><th>Paid</th><th>Unpaid</th><th>Total</th></tr></thead>
     <tbody>
@@ -56,6 +57,7 @@
       {/each}
     </tbody>
   </table>
+  </div>
 </div>
 
 <style>

@@ -42,13 +42,15 @@
       <span><i class="dot"></i>Add</span>
       <span><i class="diamond"></i>Transform</span>
     </div>
-    <table class="visually-hidden">
+    <div class="visually-hidden">
+      <table>
       <caption>{cls.name} stock at the end of each day with movements</caption>
       <thead><tr><th scope="col">Date</th><th scope="col">Stock</th></tr></thead>
       <tbody>
         {#each m.days as d (d.date)}<tr><td>{d.date}</td><td>{fmt(d.balance)}</td></tr>{/each}
       </tbody>
     </table>
+    </div>
   </figure>
 {/if}
 
