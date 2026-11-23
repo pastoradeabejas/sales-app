@@ -7,6 +7,7 @@
   import { appearance, setThemePref } from '../theme.svelte.ts';
   import type { ThemePref } from '../theme.ts';
   import { isConfigured } from '../../store/settings.ts';
+  import Backup from './settings/Backup.svelte';
 
 
   const configured = $derived(isConfigured(app.settings));
@@ -68,6 +69,8 @@
       <button type="button" class="btn" onclick={() => (confirmDemo = true)}>Use demo data</button>
     </section>
   {/if}
+
+  {#if configured}<Backup />{/if}
 
   <section class="card stack">
     <h2>Appearance</h2>

@@ -266,6 +266,11 @@ export async function mergeClients(keepId: Id, dupId: Id) {
   await store.saveMany(items);
 }
 
+/** Writes a backup restore plan through the outbox (records keep their stamps). */
+export async function importBackup(plan: { type: RecordType; record: { id: Id; date?: string } }[]) {
+  await store.importRecords(plan.map((p) => item(p.type, p.record)));
+}
+
 /** Store name of a record type (for generic screens). */
 export const storeOf = (t: RecordType) => STORE_OF[t];
 
