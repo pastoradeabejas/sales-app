@@ -53,6 +53,13 @@
   const Current = $derived(screens[name]);
   const fab = $derived(name === 'overview' || name === 'orders');
   // Forms have their own sticky footer: no bottom nav there.
+  // Mac / wide screens: list and detail side by side on Orders and Clients (§8).
+  const wideQuery = matchMedia('(min-width: 900px)');
+  let wide = $state(wideQuery.matches);
+  wideQuery.addEventListener('change', (e) => (wide = e.matches));
+  const splitList = $derived(
+    !wide ? null : name === 'orders' || name === 'order' ? 'orders' : name === 'clients' || name === 'client' ? 'clients' : null,
+  );
   const form = $derived(['order-new', 'order-edit', 'stock-add', 'stock-remove', 'stock-transform'].includes(name));
 </script>
 
@@ -66,8 +73,22 @@
   <p class="warning app-error" role="alert">This data needs a newer app version. Update the app (reload).</p>
 {/if}
 
-<main class:with-fab={fab} class:form>
-  {#if app.ready}
+<main class:with-fab={fab} class:form class:split={splitList}>
+  {#if app.ready && splitList}
+    {@const List = screens[splitList]}
+    <div class="pane list-pane">
+      <List params={{ route: splitList }} query={router.query} />
+    </div>
+    <div class="pane detail-pane">
+      {#if name === splitList}
+        <p class="muted pick">Select {splitList === 'orders' ? 'an order' : 'a client'} to see it here.</p>
+      {:else}
+        {#key `${name}/${JSON.stringify(router.route.params)}`}
+          <Current params={{ ...router.route.params, route: name }} query={router.query} />
+        {/key}
+      {/if}
+    </div>
+  {:else if app.ready}
     {#key `${name}/${JSON.stringify(router.route.params)}`}
       <Current params={{ ...router.route.params, route: name }} query={router.query} />
     {/key}
@@ -90,6 +111,27 @@
   }
   main.form {
     padding-bottom: 280px;
+  }
+  main.split {
+    display: grid;
+    grid-template-columns: minmax(320px, 2fr) minmax(0, 3fr);
+    gap: 8px;
+    max-width: 1280px;
+    align-items: start;
+  }
+  .pane {
+    min-width: 0;
+  }
+  .detail-pane {
+    position: sticky;
+    top: 0;
+    max-height: 100dvh;
+    overflow-y: auto;
+    border-left: 1px solid var(--border);
+  }
+  .pick {
+    padding: 80px 24px;
+    text-align: center;
   }
   .loading {
     padding: 40px 20px;

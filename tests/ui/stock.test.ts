@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { classTimeline } from '../../src/core/stock.ts';
 import type { Decimals, Order, ProductClass, StockAdjust, StockTransform } from '../../src/core/types.ts';
 import {
+  amountStep,
   chartModel,
+  stepAmount,
+  activeRecipes,
+  recipeNameError,
   costsFromForm,
   dayLabel,
   daysLeftText,
@@ -309,5 +313,35 @@ describe('chartModel', () => {
     const m = chartModel(neg, '2026-11-10', 100, 100, 0)!;
     expect(m.min).toBe(-10);
     expect(m.points[m.points.length - 1]).toEqual([100, 100]);
+  });
+});
+
+describe('amount steppers', () => {
+  it('steps one base unit', () => {
+    expect(amountStep(0)).toBe(1);
+    expect(amountStep(2)).toBe(100);
+    expect(amountStep(3)).toBe(1000);
+  });
+  it('steps up and down, never below 0', () => {
+    expect(stepAmount(1500, 3, 1)).toBe(2500);
+    expect(stepAmount(1500, 3, -1)).toBe(500);
+    expect(stepAmount(500, 3, -1)).toBe(0);
+    expect(stepAmount(0, 0, -1)).toBe(0);
+    expect(stepAmount(null, 0, 1)).toBe(1);
+  });
+});
+
+describe('recipe helpers', () => {
+  const r = (id: string, name: string, archived = false) => ({ id, name, archived });
+  it('lists non-archived recipes by name', () => {
+    expect(activeRecipes([r('1', 'b'), r('2', 'A', true), r('3', 'a')]).map((x) => x.id)).toEqual(['3', '1']);
+  });
+  it('name must be present and unique among non-archived, case-insensitive', () => {
+    const all = [r('1', 'Yogurt'), r('2', 'Old', true)];
+    expect(recipeNameError('  ', all, null)).not.toBe('');
+    expect(recipeNameError('yogurt', all, null)).not.toBe('');
+    expect(recipeNameError('yogurt', all, '1')).toBe('');
+    expect(recipeNameError('Old', all, null)).toBe('');
+    expect(recipeNameError('Cheese', all, null)).toBe('');
   });
 });

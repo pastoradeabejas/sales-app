@@ -22,6 +22,9 @@
     movePreview,
     rowsFromList,
     sharesToPercents,
+    stepAmount,
+    toInputText,
+    activeRecipes,
     transformSummary,
     type CostForm,
     type TRow,
@@ -31,7 +34,7 @@
 
   const MAX_ROWS = 5;
   const classes = $derived(app.products.filter((c) => c.trackStock && !c.archived).sort((a, b) => a.name.localeCompare(b.name)));
-  const recipes = $derived(app.recipes.filter((r) => !r.archived).sort((a, b) => a.name.localeCompare(b.name)));
+  const recipes = $derived(activeRecipes(app.recipes));
   const decimalsOf = (id: string): Decimals => view.classesById.get(id)?.unit.decimals ?? 0;
   const emptyRow = (classId = ''): TRow => ({ classId, text: '', base: null });
 
@@ -69,6 +72,11 @@
     const all = editRow([...inputs, ...outputs], side === 'in' ? i : inputs.length + i, text, decimalsOf);
     inputs = all.slice(0, inputs.length);
     outputs = all.slice(inputs.length);
+  }
+  function stepRow(side: 'in' | 'out', i: number, dir: 1 | -1) {
+    const r = (side === 'in' ? inputs : outputs)[i];
+    const d = decimalsOf(r.classId);
+    edit(side, i, toInputText(stepAmount(amountOf(r), d, dir), d));
   }
   function setClass(side: 'in' | 'out', i: number, classId: string) {
     const rows = side === 'in' ? inputs : outputs;
@@ -206,17 +214,21 @@
               <option value="" disabled>Choose…</option>
               {#each classes as c (c.id)}<option value={c.id}>{c.name}</option>{/each}
             </select>
-            <div class="suffix">
-              <input
-                class="input"
-                inputmode="decimal"
-                autocomplete="off"
-                placeholder="0"
-                aria-label="{side === 'in' ? 'Input' : 'Output'} {i + 1} amount"
-                value={r.text}
-                oninput={(e) => edit(side, i, e.currentTarget.value)}
-              />
-              <span aria-hidden="true">{unitOf(r.classId)}</span>
+            <div class="amt">
+              <button type="button" class="step" aria-label="{side === 'in' ? 'Input' : 'Output'} {i + 1} less" onclick={() => stepRow(side, i, -1)}>−</button>
+              <div class="suffix">
+                <input
+                  class="input"
+                  inputmode="decimal"
+                  autocomplete="off"
+                  placeholder="0"
+                  aria-label="{side === 'in' ? 'Input' : 'Output'} {i + 1} amount"
+                  value={r.text}
+                  oninput={(e) => edit(side, i, e.currentTarget.value)}
+                />
+                <span aria-hidden="true">{unitOf(r.classId)}</span>
+              </div>
+              <button type="button" class="step" aria-label="{side === 'in' ? 'Input' : 'Output'} {i + 1} more" onclick={() => stepRow(side, i, 1)}>+</button>
             </div>
             {#if items.length > 1}
               <button type="button" class="icon-btn" aria-label="Remove row {i + 1}" onclick={() => removeRow(side, i)}><Icon name="close" size={18} /></button>
@@ -426,16 +438,34 @@
   }
   .row-main {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     align-items: center;
   }
   .row-main select {
-    flex: 1.3;
+    flex: 1 1 100%;
     min-width: 0;
   }
-  .row-main .suffix {
+  .amt {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+  .amt .suffix {
     flex: 1;
     min-width: 0;
+  }
+  .step {
+    flex: none;
+    width: var(--tap);
+    height: var(--tap);
+    border-radius: var(--radius-control);
+    border: 1px solid var(--border);
+    background: var(--chip);
+    color: var(--ink);
+    font-size: 20px;
   }
   .suffix {
     position: relative;

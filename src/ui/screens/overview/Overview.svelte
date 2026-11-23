@@ -14,6 +14,7 @@
   import ProfitCard from './ProfitCard.svelte';
   import SyncBadge from './SyncBadge.svelte';
   import UnitsSold from './UnitsSold.svelte';
+  import { stockLine } from './stockLine.ts';
   import { owedDetail, viewRange } from './logic.ts';
   import type { RangeKind } from './logic.ts';
 
@@ -38,7 +39,7 @@
         const stockNow = view.snapshot.get(p.id)?.stock ?? 0;
         const rate = sellRate(p.id, app.orders, today);
         const left = rate.enoughData ? daysLeft(stockNow, rate.perDay) : null;
-        return { cls: p, stock: stockNow, left, low: isLowStock(p, stockNow) };
+        return { cls: p, stock: stockNow, left, last: view.snapshot.get(p.id)?.last ?? null, low: isLowStock(p, stockNow) };
       }),
   );
 </script>
@@ -106,7 +107,7 @@
           <a class="list-row" href="#/stock">
             <span class="grow">
               <span class="title">{s.cls.name}</span>
-              {#if s.left !== null}<span class="muted">≈ {s.left} days left</span>{/if}
+              <span class="muted">{stockLine(s.cls, s.left, s.last)}</span>
             </span>
             {#if s.low}<Tag tone="low">Low</Tag>{/if}
             <span class="amount">{formatAmount(s.stock, s.cls.unit.decimals, s.cls.unit.name)}</span>

@@ -300,3 +300,23 @@ export function chartModel(timeline: Movement[], today: string, w = 340, h = 120
   const markers = days.flatMap((d) => [...(kinds.get(d.date) ?? [])].map((kind) => ({ x: x(d.date), y: y(d.balance), kind })));
   return { points: dedup, markers, min, max, days, first, last, y };
 }
+
+/** Stepper step: one base unit (1 kg, 1 L, 1 pc) in scaled units. */
+export const amountStep = (decimals: Decimals): Scaled => 10 ** decimals;
+
+/** One step up or down from the current amount (null counts as 0), never below 0. */
+export function stepAmount(scaled: Scaled | null, decimals: Decimals, dir: 1 | -1): Scaled {
+  return Math.max(0, (scaled ?? 0) + dir * amountStep(decimals));
+}
+
+/** Recipes that can be used (not archived), by name. */
+export function activeRecipes<T extends { name: string; archived: boolean }>(recipes: T[]): T[] {
+  return recipes.filter((r) => !r.archived).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Error text for a recipe name: required, unique among non-archived recipes (case-insensitive); '' when fine. */
+export function recipeNameError(name: string, recipes: { id: Id; name: string; archived: boolean }[], selfId: Id | null): string {
+  const n = name.trim().toLowerCase();
+  if (!n) return 'Give the recipe a name.';
+  return recipes.some((r) => !r.archived && r.id !== selfId && r.name.trim().toLowerCase() === n) ? 'A recipe with this name already exists.' : '';
+}

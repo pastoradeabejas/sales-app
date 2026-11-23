@@ -10,7 +10,7 @@
   import { go } from '../../router.svelte.ts';
   import { showToast } from '../../toast.svelte.ts';
   import ClassPicker from './ClassPicker.svelte';
-  import { movePreview, REASONS, reasonValue } from './logic.ts';
+  import { movePreview, REASONS, reasonValue, stepAmount, toInputText } from './logic.ts';
 
   let { params = {}, query = {} }: { params?: Record<string, string>; query?: Record<string, string> } = $props();
 
@@ -39,6 +39,7 @@
   const stock = $derived(cls ? (view.snapshot.get(cls.id)?.stock ?? 0) : 0);
   const preview = $derived(movePreview(stock, type, amount));
   const storedReason = $derived(reasonValue(reason, otherText));
+  const step = (dir: 1 | -1) => (amountText = toInputText(stepAmount(amount, decimals, dir), decimals));
   const fmt = (v: number) => formatAmount(v, decimals, unit);
 
   const errors = $derived({
@@ -104,9 +105,13 @@
 
     <div class="field">
       <label for="amount">Amount</label>
-      <div class="suffix">
-        <input id="amount" class="input big" inputmode="decimal" autocomplete="off" placeholder="0" bind:value={amountText} aria-invalid={tried && !!errors.amount} />
-        <span aria-hidden="true">{unit}</span>
+      <div class="stepper">
+        <button type="button" class="step" aria-label="Less" onclick={() => step(-1)}>−</button>
+        <div class="suffix">
+          <input id="amount" class="input big" inputmode="decimal" autocomplete="off" placeholder="0" bind:value={amountText} aria-invalid={tried && !!errors.amount} />
+          <span aria-hidden="true">{unit}</span>
+        </div>
+        <button type="button" class="step" aria-label="More" onclick={() => step(1)}>+</button>
       </div>
       {#if tried && errors.amount}<p class="error">{errors.amount}</p>{/if}
     </div>
@@ -169,6 +174,25 @@
 <style>
   .form {
     padding-bottom: 120px;
+  }
+  .stepper {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .stepper .suffix {
+    flex: 1;
+    min-width: 0;
+  }
+  .step {
+    flex: none;
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: var(--chip);
+    color: var(--ink);
+    font-size: 22px;
   }
   .suffix {
     position: relative;
