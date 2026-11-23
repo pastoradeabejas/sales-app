@@ -113,7 +113,7 @@
       variants,
     };
     await saveClass(cls);
-    showToast(isNew ? 'Class added. Now add its variants.' : 'Class saved');
+    showToast(isNew && sellable ? 'Class added. Now add its variants.' : isNew ? 'Class added' : 'Class saved');
     if (isNew) go(`#/products/${cls.id}`, true);
   }
 
@@ -271,7 +271,7 @@
         {/each}
       </div>
 
-      <button type="submit" class="btn btn-primary btn-block">{isNew ? 'Save and add variants' : 'Save class'}</button>
+      <button type="submit" class="btn btn-primary btn-block">{isNew && sellable ? 'Save and add variants' : isNew ? 'Save' : 'Save class'}</button>
     </form>
 
     {#if stored}
