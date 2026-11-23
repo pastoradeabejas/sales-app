@@ -11,6 +11,7 @@
   import Tag from '../../components/Tag.svelte';
   import { app, localDate, view } from '../../data.svelte.ts';
   import OwedCard from './OwedCard.svelte';
+  import ProfitCard from './ProfitCard.svelte';
   import SyncBadge from './SyncBadge.svelte';
   import UnitsSold from './UnitsSold.svelte';
   import { owedDetail, viewRange } from './logic.ts';
@@ -134,6 +135,8 @@
     <div class="card"><span class="muted">Sales {rangeNoun}</span><span class="big">{formatMoney(sales)}</span></div>
     <div class="card"><span class="muted">Collected {rangeNoun}</span><span class="big">{formatMoney(paidIn)}</span></div>
   </section>
+
+  <ProfitCard {range} />
 </div>
 
 <style>

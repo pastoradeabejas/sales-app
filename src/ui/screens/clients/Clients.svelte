@@ -6,6 +6,7 @@
   import Header from '../../components/Header.svelte';
   import SearchField from '../../components/SearchField.svelte';
   import Segmented from '../../components/Segmented.svelte';
+  import GoneQuiet from './GoneQuiet.svelte';
   import ClientSheet from './ClientSheet.svelte';
   import { clientRows, filterClients, shortDate, sortRows, type ClientSort } from './logic.ts';
 
@@ -43,6 +44,8 @@
       { value: 'last', label: 'Last order' },
     ]}
   />
+
+  <GoneQuiet />
 
   {#if rows.length === 0}
     <EmptyState title={app.clients.length === 0 ? 'No clients yet' : 'No clients found'}>

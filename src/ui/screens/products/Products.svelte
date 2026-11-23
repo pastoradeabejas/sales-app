@@ -7,15 +7,19 @@
   import { formatAmount } from '../../../core/quantity.ts';
   import { isLowStock } from '../../../core/stock.ts';
   import { rangeFor, unitsSold, type ClassSold } from '../../../core/stats.ts';
+  import CustomFilter from './CustomFilter.svelte';
+  import { filterByCustomField } from './customFilter.ts';
   import { priceLabel, sortClasses, sortedVariants } from './logic.ts';
 
   let showArchived = $state(false);
+  let fieldKey = $state('');
+  let fieldText = $state('');
 
   const sold = $derived(
     new Map<string, ClassSold>(unitsSold(app.orders, view.balances, rangeFor('month', localDate())).map((c) => [c.classId, c])),
   );
   const classes = $derived(sortClasses(app.products));
-  const shown = $derived(classes.filter((c) => showArchived || !c.archived));
+  const shown = $derived(filterByCustomField(classes.filter((c) => showArchived || !c.archived), fieldKey, fieldText));
   const archivedCount = $derived(classes.filter((c) => c.archived).length);
 </script>
 
@@ -31,6 +35,8 @@
       <a class="btn btn-primary" href="#/products/new">+ New class</a>
     </EmptyState>
   {/if}
+
+  <CustomFilter {classes} bind:key={fieldKey} bind:text={fieldText} />
 
   {#each shown as c (c.id)}
     {@const snap = view.snapshot.get(c.id)}
