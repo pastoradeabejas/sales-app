@@ -8,6 +8,7 @@
   import { router } from './ui/router.svelte.ts';
   import { tabOf, type RouteName } from './ui/router.ts';
   import { isConfigured } from './store/settings.ts';
+  import { startSync, sync } from './ui/sync.svelte.ts';
   import Settings from './ui/screens/Settings.svelte';
   import Overview from './ui/screens/overview/Overview.svelte';
   import Orders from './ui/screens/orders/Orders.svelte';
@@ -43,7 +44,9 @@
     product: ClassDetail,
   };
 
-  initData().catch((e) => (app.error = `Could not open local data: ${e instanceof Error ? e.message : e}`));
+  initData()
+    .then(startSync)
+    .catch((e) => (app.error = `Could not open local data: ${e instanceof Error ? e.message : e}`));
 
   // First run: Settings until the device is configured (§8.1).
   const name = $derived<RouteName>(app.ready && !isConfigured(app.settings) ? 'settings' : router.route.name);
@@ -55,6 +58,12 @@
 
 {#if app.error}
   <p class="warning app-error" role="alert">{app.error}</p>
+{/if}
+
+{#if sync.state.authError && name !== 'settings'}
+  <p class="warning app-error" role="alert">Token invalid or expired. <a href="#/settings">Open Settings</a></p>
+{:else if sync.state.readOnly}
+  <p class="warning app-error" role="alert">This data needs a newer app version. Update the app (reload).</p>
 {/if}
 
 <main class:with-fab={fab} class:form>

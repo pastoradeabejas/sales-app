@@ -2,16 +2,17 @@
   import ConfirmSheet from '../components/ConfirmSheet.svelte';
   import Header from '../components/Header.svelte';
   import Segmented from '../components/Segmented.svelte';
-  import { app, clearDevice, startDemo, updateSettings } from '../data.svelte.ts';
+  import { app, clearDevice, startDemo } from '../data.svelte.ts';
+  import { startSync, stopSync } from '../sync.svelte.ts';
   import { go } from '../router.svelte.ts';
   import { appearance, setThemePref } from '../theme.svelte.ts';
   import type { ThemePref } from '../theme.ts';
   import { isConfigured } from '../../store/settings.ts';
   import Backup from './settings/Backup.svelte';
+  import SyncSettings from './settings/SyncSettings.svelte';
 
 
   const configured = $derived(isConfigured(app.settings));
-  let deviceName = $state(app.settings.deviceName);
   let confirmDemo = $state(false);
   let confirmLeave = $state(false);
 
@@ -23,8 +24,8 @@
   let theme = $state(appearance.pref);
 
   async function useDemo() {
-    updateSettings({ deviceName: deviceName.trim() || 'Demo' });
     await startDemo();
+    startSync();
     go('#/overview');
   }
 </script>
@@ -48,20 +49,7 @@
       <button type="button" class="btn" onclick={() => (confirmLeave = true)}>Leave demo mode</button>
     </section>
   {:else}
-    <section class="card stack">
-      <h2>This device</h2>
-      <div class="field">
-        <label for="device-name">Device name</label>
-        <input
-          id="device-name"
-          class="input"
-          placeholder="e.g. Phone A"
-          bind:value={deviceName}
-          onchange={() => updateSettings({ deviceName: deviceName.trim() })}
-        />
-      </div>
-      <p class="hint">Shown in the data history as the author of each change.</p>
-    </section>
+    <SyncSettings />
 
     <section class="card stack">
       <h2>Use without sync</h2>
@@ -87,7 +75,10 @@
   <p>This replaces any data on this device with sample data. Sync stays off.</p>
 </ConfirmSheet>
 
-<ConfirmSheet bind:open={confirmLeave} title="Leave demo mode?" confirmLabel="Clear demo data" danger onconfirm={clearDevice}>
+<ConfirmSheet bind:open={confirmLeave} title="Leave demo mode?" confirmLabel="Clear demo data" danger onconfirm={async () => {
+    stopSync();
+    await clearDevice();
+  }}>
   <p>The sample data is deleted from this device.</p>
 </ConfirmSheet>
 
