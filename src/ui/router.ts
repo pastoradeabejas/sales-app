@@ -50,3 +50,9 @@ export function parseRoute(hash: string): Route {
 export function tabOf(name: RouteName): Tab {
   return routes.find((r) => r[0] === name)![2];
 }
+
+/** Query parameters after `?` in the hash (e.g. `#/stock/transform?input=<classId>`). */
+export function parseQuery(hash: string): Record<string, string> {
+  const q = hash.indexOf('?');
+  return q < 0 ? {} : Object.fromEntries(new URLSearchParams(hash.slice(q + 1)));
+}
