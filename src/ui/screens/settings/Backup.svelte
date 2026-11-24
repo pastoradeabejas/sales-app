@@ -18,7 +18,7 @@
 
   function exportCsv() {
     const files = exportFiles(
-      { orders: app.orders, payments: app.payments, clients: app.clients, stock: app.stock, classes: app.products },
+      { orders: app.orders, payments: app.payments, clients: app.clients, stock: app.stock, classes: app.products, purchases: app.purchases, suppliers: app.suppliers },
       localDate(),
     );
     for (const f of files) download(f.name, f.content, 'text/csv;charset=utf-8');
@@ -57,7 +57,7 @@
       return;
     }
     error = '';
-    const all = [...app.products, ...app.clients, ...app.orders, ...app.payments, ...app.stock, ...app.recipes];
+    const all = [...app.products, ...app.clients, ...app.orders, ...app.payments, ...app.stock, ...app.recipes, ...app.suppliers, ...app.purchases, ...app.levels];
     plan = restorePlan(parsed.backup, new Map(all.map((r) => [r.id, r.updatedAt])));
     const counts = restoreCounts(plan);
     const names: [keyof typeof counts, string][] = [
@@ -67,6 +67,9 @@
       ['payment', 'payments'],
       ['stock', 'stock events'],
       ['recipe', 'recipes'],
+      ['supplier', 'suppliers'],
+      ['purchase', 'purchases'],
+      ['level', 'work levels'],
     ];
     summary = names
       .filter(([k]) => counts[k] > 0)

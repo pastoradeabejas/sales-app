@@ -30,6 +30,14 @@ async function describe(type: RecordType, r: any, lookup: Lookup): Promise<[stri
     case 'stock':
       if (r.type === 'transform') return [`transform${v}`, `${await side(lookup, r.inputs, '−')} → ${await side(lookup, r.outputs, '+')}`];
       return [`stock ${r.type}${v}`, await side(lookup, [r], r.type === 'add' ? '+' : '−')];
+    case 'purchase': {
+      const lines = r.lines.map((l: any) => `${l.className} +${formatAmount(l.amount, l.decimals, l.unitName)}`).join(', ');
+      return [`purchase${v}`, `${r.supplierName || 'No supplier'}, ${lines} (${formatMoney(r.total)})`];
+    }
+    case 'supplier':
+      return ['supplier', r.name];
+    case 'level':
+      return ['level', `${r.name} ${formatMoney(r.hourlyRate)}/h`];
     default:
       return [type, fullName(r)];
   }

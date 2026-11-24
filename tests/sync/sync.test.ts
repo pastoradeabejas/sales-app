@@ -120,6 +120,17 @@ describe('pull (§6.3)', () => {
     expect(JSON.parse(fake.files.get(ORDER_PATH)!).note).toBe('local');
   });
 
+  it('upgrades an older meta.json to the current schema, keeping its fields (§16.8)', async () => {
+    const old = JSON.stringify({ app: 'sales-bookkeeping', schemaVersion: 1, createdAt: OLD }, null, 2) + '\n';
+    const fake = fakeGitHub({ 'meta.json': old });
+    const { deps, store } = device(fake);
+    expect((await pull(deps)).readOnly).toBe(false);
+    expect(JSON.parse(fake.files.get('meta.json')!)).toEqual({ app: 'sales-bookkeeping', schemaVersion: 2, createdAt: OLD });
+    expect(puts(fake)[0].body.message).toBe('Upgrade data schema to 2');
+    expect(await store.getMeta('schemaVersion')).toBe(2);
+    expect(await store.getMeta('metaSha')).toBe(fake.shaOf('meta.json'));
+  });
+
   it('records a newer meta.json schema (read-only)', async () => {
     const fake = fakeGitHub({ 'meta.json': '{"app":"sales-bookkeeping","schemaVersion":3}\n' });
     const { deps, store } = device(fake);

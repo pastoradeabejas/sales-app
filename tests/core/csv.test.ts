@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { toCsv, ordersCsv, linesCsv, paymentsCsv, clientsCsv, stockCsv, exportFiles } from '../../src/core/csv.ts';
+import { toCsv, ordersCsv, linesCsv, paymentsCsv, clientsCsv, stockCsv, purchasesCsv, suppliersCsv, exportFiles } from '../../src/core/csv.ts';
 import { allocateAll } from '../../src/core/payments.ts';
-import type { Client, Order, OrderLine, Payment, ProductClass, StockEvent } from '../../src/core/types.ts';
+import type { Client, Order, OrderLine, Payment, ProductClass, Purchase, StockEvent, Supplier } from '../../src/core/types.ts';
 
 const stamp = { schema: 1, createdAt: '2026-11-20T10:00:00Z', updatedAt: '2026-11-20T10:00:00Z', updatedBy: 'Phone A' };
 const line = (o: Partial<OrderLine>): OrderLine => ({
@@ -78,10 +78,28 @@ describe('exports', () => {
     const e: StockEvent = { ...stamp, id: 'e4', date: '2026-11-04', type: 'add', classId: 'c2', amount: 3, unitCost: null, reason: '', note: '', voided: false };
     expect(rows(stockCsv([e], new Map([['c2', grouped]])))[1]).toContain(',add,Honey - Rosemary - 500g Jar,');
   });
-  it('exportFiles: five named files', () => {
-    const files = exportFiles({ orders: [], payments: [], clients: [], stock: [], classes: [] }, '2026-11-24');
+  it('purchasesCsv: one row per line, amount in base units, euros', () => {
+    const p: Purchase = {
+      ...stamp, id: 'u1', date: '2026-11-05', supplierId: 's1', supplierName: 'Envases, Levante', total: 17500, method: 'bizum', note: 'n', voided: false,
+      lines: [
+        { lineId: 'a', classId: 'c1', className: 'Lid', unitName: 'pcs', decimals: 0, amount: 900, lineTotal: 13500 },
+        { lineId: 'b', classId: 'c2', className: 'Honey', unitName: 'kg', decimals: 3, amount: 1500, lineTotal: 4000 },
+      ],
+    };
+    const out = rows(purchasesCsv([p]));
+    expect(out[0]).toBe('date,purchase_id,supplier,item,amount,unit,line_total_eur,method,note,voided');
+    expect(out[1]).toBe('2026-11-05,u1,"Envases, Levante",Lid,900,pcs,135.00,bizum,n,false');
+    expect(out[2]).toBe('2026-11-05,u1,"Envases, Levante",Honey,1.5,kg,40.00,bizum,n,false');
+  });
+  it('suppliersCsv: one row per supplier', () => {
+    const s: Supplier = { ...stamp, id: 's1', name: 'Gasolinera', phone: '600', notes: 'x', archived: true };
+    expect(rows(suppliersCsv([s]))).toEqual(['name,phone,notes,archived', 'Gasolinera,600,x,true']);
+  });
+  it('exportFiles: seven named files', () => {
+    const files = exportFiles({ orders: [], payments: [], clients: [], stock: [], classes: [], purchases: [], suppliers: [] }, '2026-11-24');
     expect(files.map((f) => f.name)).toEqual([
       'sales-orders-2026-11-24.csv', 'sales-lines-2026-11-24.csv', 'sales-payments-2026-11-24.csv', 'sales-clients-2026-11-24.csv', 'sales-stock-2026-11-24.csv',
+      'sales-purchases-2026-11-24.csv', 'sales-suppliers-2026-11-24.csv',
     ]);
     expect(files[0].content.startsWith('﻿id,date')).toBe(true);
   });

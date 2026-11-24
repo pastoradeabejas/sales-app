@@ -2,6 +2,7 @@
 import { mergeRecord, resolvePending } from '../core/merge.ts';
 import { parsePath } from '../core/paths.ts';
 import { META_JSON, parseRecord } from '../core/serialize.ts';
+import { SCHEMA_VERSION } from '../core/types.ts';
 import { STORE_OF, type FileEntry, type OutboxEntry } from '../store/store.ts';
 import { conflictToast, type Lookup } from './commitMessage.ts';
 import type { GitHub, RepoFile } from './github.ts';
@@ -55,7 +56,13 @@ export async function pull({ gh, store, now }: SyncDeps, onProgress?: (done: num
 
   async function apply({ path, sha }: RepoFile, text: string) {
     if (path === META_JSON) {
-      await store.setMeta('schemaVersion', checkMeta(text).schemaVersion);
+      let { schemaVersion } = checkMeta(text);
+      if (schemaVersion < SCHEMA_VERSION) {
+        const upgraded = JSON.stringify({ ...JSON.parse(text), schemaVersion: SCHEMA_VERSION }, null, 2) + '\n';
+        sha = (await gh.putFile(META_JSON, upgraded, `Upgrade data schema to ${SCHEMA_VERSION}`, sha)).blobSha;
+        schemaVersion = SCHEMA_VERSION;
+      }
+      await store.setMeta('schemaVersion', schemaVersion);
       await store.setMeta('metaSha', sha);
       return;
     }
