@@ -16,7 +16,7 @@
   import { activeRecipes, recipeNameError, transformSummary } from '../stock/logic.ts';
   import CustomFilter from './CustomFilter.svelte';
   import { filterByCustomField } from './customFilter.ts';
-  import { priceLabel, sortClasses, sortedVariants } from './logic.ts';
+  import { costLabel, priceLabel, sortClasses, sortedVariants } from './logic.ts';
   import { COLLAPSED_KEY, VIEW_KEY, parseCollapsed, parseView, productTree, renameConflicts, toggleCollapsed } from './tree.ts';
   import { flattenTree } from '../stock/grouping.ts';
 
@@ -185,7 +185,7 @@
 {#snippet table()}
   <table class="booktabs">
     <thead>
-      <tr><th>Product</th><th>Stock</th><th>Price</th><th>Sold</th></tr>
+      <tr><th>Product</th><th>Stock</th><th>Price</th><th>Cost</th></tr>
     </thead>
     <tbody>
       {#each tableRows as r (r.kind === 'group' ? `g:${r.node.path}` : r.item.id)}
@@ -207,7 +207,6 @@
         {:else}
           {@const c = r.item}
           {@const snap = view.snapshot.get(c.id)}
-          {@const s = sold.get(c.id)}
           {@const vs = sortedVariants(c.variants)}
           <tr>
             <td style:padding-left={indent(r.depth)}>
@@ -216,16 +215,15 @@
             </td>
             <td class="num">{c.trackStock && snap ? formatAmount(snap.stock, c.unit.decimals, c.unit.name) : '—'}</td>
             <td class="num">{vs.length === 1 ? priceLabel(vs[0], c.unit.name) : vs.length ? '' : '—'}</td>
-            <td class="num">{c.sellable ? formatAmount(s?.amount ?? 0, c.unit.decimals, c.unit.name) : '—'}</td>
+            <td class="num">{costLabel(vs.length === 1 ? vs[0] : null, snap?.avgCost ?? null, c.unit.decimals, c.unit.name)}</td>
           </tr>
           {#if vs.length > 1}
             {#each vs as v (v.id)}
-              {@const x = s?.variants.find((y) => y.variantId === v.id)}
               <tr class="tvariant" class:greyed={v.archived}>
                 <td style:padding-left={indent(r.depth + 1)}>{v.label}</td>
                 <td></td>
                 <td class="num">{priceLabel(v, c.unit.name)}</td>
-                <td class="num">{v.kind === 'fixed' ? (x?.quantity ?? 0) : formatAmount(x?.amount ?? 0, c.unit.decimals, c.unit.name)}</td>
+                <td class="num">{costLabel(v, snap?.avgCost ?? null, c.unit.decimals, c.unit.name)}</td>
               </tr>
             {/each}
           {/if}

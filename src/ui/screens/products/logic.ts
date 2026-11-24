@@ -1,8 +1,9 @@
 import { normalizeName } from '../../../core/clients.ts';
 import { normalizeGroup } from '../../../core/groups.ts';
 import { parseAmount } from '../../../core/quantity.ts';
-import { formatMoney, parseMoney, parseUnitCost } from '../../../core/money.ts';
-import type { Cents, Decimals, UnitCost, VariantKind } from '../../../core/types.ts';
+import { formatMoney, formatUnitCost, parseMoney, parseUnitCost } from '../../../core/money.ts';
+import { saleUnitCost } from '../../../core/orders.ts';
+import type { Cents, Decimals, UnitCost, Variant, VariantKind } from '../../../core/types.ts';
 
 /** Required, max 60, unique within its group among non-archived classes (D-015). */
 export function validateClassName(
@@ -89,3 +90,14 @@ export function fieldKey(label: string, existing: string[]): string {
 /** Price as shown in tables: per item for fixed, per base unit for variable. */
 export const priceLabel = (v: { kind: VariantKind; price: Cents }, unitName: string): string =>
   formatMoney(v.price) + (v.kind === 'variable' ? `/${unitName}` : '');
+
+/** Cost shown in the table: a variant's sale cost (§3.6b), or the class average per unit when `v` is null. */
+export function costLabel(
+  v: Pick<Variant, 'kind' | 'cost' | 'baseAmount'> | null,
+  avg: UnitCost | null,
+  decimals: Decimals,
+  unitName: string,
+): string {
+  const cost = v ? saleUnitCost(v, avg, decimals) : avg;
+  return cost === null ? '—' : formatUnitCost(cost) + (!v || v.kind === 'variable' ? `/${unitName}` : '');
+}

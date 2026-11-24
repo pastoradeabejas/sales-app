@@ -18,7 +18,7 @@ export function orderTotal(lines: Pick<OrderLine, 'lineTotal'>[]): Cents {
 }
 
 // Cost snapshot for a sale line: variant cost, else class average (§3.6b), else null.
-export function saleUnitCost(variant: Variant, classAvgCost: number | null, decimals: number): UnitCost | null {
+export function saleUnitCost(variant: Pick<Variant, 'kind' | 'cost' | 'baseAmount'>, classAvgCost: number | null, decimals: number): UnitCost | null {
   if (variant.cost !== null) return variant.cost;
   if (classAvgCost === null) return null;
   const perItem = variant.kind === 'fixed' ? (classAvgCost * (variant.baseAmount ?? 0)) / 10 ** decimals : classAvgCost;

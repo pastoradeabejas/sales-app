@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  costLabel,
   fieldKey,
   priceLabel,
   moveVariant,
@@ -95,5 +96,22 @@ describe('priceLabel', () => {
   it('shows per-item or per-unit prices', () => {
     expect(priceLabel({ kind: 'fixed', price: 1400 }, 'kg')).toBe('€14.00');
     expect(priceLabel({ kind: 'variable', price: 2600 }, 'kg')).toBe('€26.00/kg');
+  });
+});
+
+describe('costLabel', () => {
+  const v = (kind: 'fixed' | 'variable', cost: number | null, baseAmount: number | null = null) => ({ kind, cost, baseAmount });
+  it('shows the class average per unit, or a dash when unknown', () => {
+    expect(costLabel(null, 15, 0, 'pcs')).toBe('€0.15/pcs');
+    expect(costLabel(null, null, 0, 'pcs')).toBe('—');
+  });
+  it('prefers the variant cost', () => {
+    expect(costLabel(v('fixed', 390), 1000, 0, 'jar')).toBe('€3.90');
+    expect(costLabel(v('variable', 950), 1000, 2, 'kg')).toBe('€9.50/kg');
+  });
+  it('falls back to the class average for the variant', () => {
+    expect(costLabel(v('fixed', null, 75), 1200, 2, 'kg')).toBe('€9.00');
+    expect(costLabel(v('variable', null), 1200, 2, 'kg')).toBe('€12.00/kg');
+    expect(costLabel(v('fixed', null, 1), null, 0, 'jar')).toBe('—');
   });
 });
