@@ -122,26 +122,17 @@ describe('transform rows', () => {
       { classId: 'yog', text: '10000', base: 10000 },
     ]);
   });
-  it('changing a linked row scales the others; the edited row drives the scaling', () => {
+  it('changing a linked row scales the others and unlinks the edited one', () => {
     const rows = editRow(recipe(), 0, '750', dec);
     expect(rows).toEqual([
-      { classId: 'milk', text: '750', base: 500000, driver: true },
+      { classId: 'milk', text: '750', base: null },
       { classId: 'yog', text: '15000', base: 10000 },
     ]);
-  });
-  it('the row being changed keeps scaling the others: + then typing 10 (D-018)', () => {
-    let rows = editRow(recipe(), 1, '20000', dec);
-    expect(rows[0].text).toBe('1000');
-    rows = editRow(rows, 1, '', dec);
-    rows = editRow(rows, 1, '1', dec);
-    rows = editRow(rows, 1, '100000', dec);
-    expect(rows.map((r) => r.text)).toEqual(['5000', '100000']);
   });
   it('a row edited by hand is no longer overwritten by scaling', () => {
     let rows = editRow(recipe(), 0, '750', dec);
     rows = editRow(rows, 1, '14800', dec);
-    expect(rows[0]).toEqual({ classId: 'milk', text: '750', base: null });
-    expect(rows[1].text).toBe('14800');
+    expect(rows[1]).toEqual({ classId: 'yog', text: '14800', base: null });
     rows = editRow(rows, 0, '1000', dec);
     expect(rows.map((r) => r.text)).toEqual(['1000', '14800']);
   });

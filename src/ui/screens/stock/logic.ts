@@ -43,8 +43,6 @@ export interface TRow {
   classId: Id;
   text: string;
   base: Scaled | null;
-  /** The row being changed: it keeps scaling the others until another row is edited (D-018). */
-  driver?: boolean;
 }
 
 export function rowsFromList(list: ClassAmount[], decimalsOf: (id: Id) => Decimals): TRow[] {
@@ -52,19 +50,15 @@ export function rowsFromList(list: ClassAmount[], decimalsOf: (id: Id) => Decima
 }
 
 /**
- * Hand edit of one row (§3.6a). A linked row becomes the driver: while it is changed (steps, typing),
- * every other linked row is scaled from its recipe base by the same factor. Editing another row
- * unlinks the previous driver, which then counts as edited by hand (D-018).
+ * Hand edit of one row: that row is unlinked; if it was linked and the amount is valid,
+ * every still-linked row is scaled from its recipe base by the same factor (§3.6a).
  */
 export function editRow(rows: TRow[], index: number, text: string, decimalsOf: (id: Id) => Decimals): TRow[] {
   const edited = rows[index];
-  const out = rows.map((r, i): TRow => {
-    if (i === index) return edited.base === null ? { classId: r.classId, text, base: null } : { ...r, text, driver: true };
-    return r.driver ? { classId: r.classId, text: r.text, base: null } : r;
-  });
+  const out = rows.map((r, i) => (i === index ? { ...r, text, base: null } : r));
   const amount = parseAmount(text, decimalsOf(edited.classId));
   if (edited.base === null || amount === null) return out;
-  const linked = out.map((r, i) => ({ r, i })).filter(({ r, i }) => i !== index && r.base !== null);
+  const linked = out.map((r, i) => ({ r, i })).filter(({ r }) => r.base !== null);
   const scaled = scaleRows(
     [{ classId: edited.classId, amount }, ...linked.map(({ r }) => ({ classId: r.classId, amount: r.base! }))],
     [{ classId: edited.classId, amount: edited.base }, ...linked.map(({ r }) => ({ classId: r.classId, amount: r.base! }))],
