@@ -57,14 +57,18 @@
   );
   let tried = $state(false);
   // Kind (§16.3): an expense item has no stock, price or variants.
-  let kind = $state<'product' | 'expense'>(isExpenseItem(initial) ? 'expense' : 'product');
+  // ?kind=expense (from Expenses › + New expense item) starts as an expense item.
+  let kind = $state<'product' | 'expense'>(isExpenseItem(initial) || (isNew && untrack(() => query.kind) === 'expense') ? 'expense' : 'product');
   const expense = $derived(kind === 'expense');
   function onKind(k: 'product' | 'expense') {
     trackStock = k === 'product';
     sellable = k === 'product';
     if (k === 'expense' && !groupText.trim()) groupText = 'Expenses';
   }
+  if (isNew && untrack(() => kind) === 'expense') onKind('expense');
 
+  // Back to the list this class belongs to (Products, Stock or Expenses).
+  const listHref = $derived(expense ? '#/expense-items' : sellable ? '#/products' : '#/stock');
   const missing = $derived(!isNew && !stored);
   const locked = $derived(!isNew && decimalsLocked(classId as string));
   const dec = $derived(Number(decimals) as Decimals);
@@ -182,11 +186,11 @@
     const archived = !stored.archived;
     await saveClass({ ...($state.snapshot(stored) as ProductClass), archived });
     showToast(archived ? 'Class archived' : 'Class restored');
-    if (archived) go('#/products');
+    if (archived) go(listHref);
   }
 </script>
 
-<Header title={isNew ? 'New product' : stored ? fullName(stored) : 'Product'} back="#/products" />
+<Header title={isNew ? (expense ? 'New expense item' : 'New product') : stored ? fullName(stored) : 'Product'} back={listHref} />
 
 <div class="page">
   {#if missing}

@@ -120,8 +120,9 @@ describe('costLabel', () => {
 describe('sideClasses (D-025)', () => {
   const c = (id: string, sellable: boolean, trackStock = true) => ({ id, sellable, trackStock });
   const all = [c('jar', true), c('bulk', false), c('lid', false), c('fuel', false, false), c('service', true, false)];
-  it('Products: what is sold; Stock: inventory that is not sold (bulk, packaging, expense items)', () => {
+  it('Products: what is sold; Stock: inventory not sold (bulk, packaging); Expenses: expense items (D-028)', () => {
     expect(sideClasses(all, 'products').map((x) => x.id)).toEqual(['jar', 'service']);
-    expect(sideClasses(all, 'stock').map((x) => x.id)).toEqual(['bulk', 'lid', 'fuel']);
+    expect(sideClasses(all, 'stock').map((x) => x.id)).toEqual(['bulk', 'lid']);
+    expect(sideClasses(all, 'expenses').map((x) => x.id)).toEqual(['fuel']);
   });
 });

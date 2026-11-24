@@ -19,6 +19,7 @@ const routes = [
   ['products', 'products', 'stock'],
   ['product', 'products/:classId', 'stock'],
   ['recipes', 'recipes', 'stock'],
+  ['expense-items', 'expense-items', 'expenses'],
   ['purchases', 'purchases', 'expenses'],
   ['purchase-new', 'purchases/new', 'expenses'],
   ['purchase', 'purchases/:id', 'expenses'],
@@ -67,7 +68,7 @@ export function parseQuery(hash: string): Record<string, string> {
 /** The two list screens (sides) of each two-sided tab; the first is the default. */
 export const SIDES: Record<string, string[]> = {
   orders: ['orders', 'clients'],
-  expenses: ['purchases', 'suppliers'],
+  expenses: ['purchases', 'suppliers', 'expense-items'],
   stock: ['products', 'stock', 'recipes'],
 };
 

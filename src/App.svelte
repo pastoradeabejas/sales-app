@@ -42,6 +42,7 @@
     client: ClientDetail,
     stock: Products,
     recipes: Recipes,
+    'expense-items': Products,
     'stock-add': StockMove,
     'stock-remove': StockMove,
     'stock-transform': Transform,

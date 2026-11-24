@@ -27,9 +27,11 @@ export function sortClasses<T extends { name: string; archived: boolean }>(class
   return [...classes].sort((a, b) => Number(a.archived) - Number(b.archived) || a.name.localeCompare(b.name));
 }
 
-/** Stock tab sides (D-025): Products = what is sold; Stock = inventory not sold (bulk, packaging, expense items). */
-export const sideClasses = <T extends { sellable: boolean }>(classes: T[], side: 'products' | 'stock'): T[] =>
-  classes.filter((c) => c.sellable === (side === 'products'));
+export type ClassSide = 'products' | 'stock' | 'expenses';
+
+/** Catalogue lists (D-025, D-028): Products = sold; Stock = inventory not sold (bulk, packaging); Expenses = expense items. */
+export const sideClasses = <T extends { sellable: boolean; trackStock: boolean }>(classes: T[], side: ClassSide): T[] =>
+  classes.filter((c) => (side === 'products' ? c.sellable : side === 'stock' ? !c.sellable && c.trackStock : !c.sellable && !c.trackStock));
 
 export const sortedVariants = <T extends { sortOrder: number }>(vs: T[]): T[] =>
   [...vs].sort((a, b) => a.sortOrder - b.sortOrder);

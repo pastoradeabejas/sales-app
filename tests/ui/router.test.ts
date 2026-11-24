@@ -18,6 +18,7 @@ describe('parseRoute', () => {
     ['#/products', 'products', {}],
     ['#/products/cls1', 'product', { classId: 'cls1' }],
     ['#/recipes', 'recipes', {}],
+    ['#/expense-items', 'expense-items', {}],
     ['#/settings', 'settings', {}],
     ['#/purchases', 'purchases', {}],
     ['#/purchases/new', 'purchase-new', {}],
@@ -62,6 +63,7 @@ describe('tabOf', () => {
     ['products', 'stock'],
     ['product', 'stock'],
     ['recipes', 'stock'],
+    ['expense-items', 'expenses'],
     ['purchases', 'expenses'],
     ['purchase-new', 'expenses'],
     ['purchase', 'expenses'],
@@ -75,7 +77,7 @@ describe('tabOf', () => {
 
 describe('tab sides', () => {
   it('lists the two sides of each tab', () => {
-    expect(SIDES).toEqual({ orders: ['orders', 'clients'], expenses: ['purchases', 'suppliers'], stock: ['products', 'stock', 'recipes'] });
+    expect(SIDES).toEqual({ orders: ['orders', 'clients'], expenses: ['purchases', 'suppliers', 'expense-items'], stock: ['products', 'stock', 'recipes'] });
   });
 
   it('builds the tab href from the remembered side', () => {

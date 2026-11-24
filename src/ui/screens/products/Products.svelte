@@ -16,12 +16,13 @@
   import type { ProductClass } from '../../../core/types.ts';
   import CustomFilter from './CustomFilter.svelte';
   import { filterByCustomField } from './customFilter.ts';
-  import { costLabel, priceLabel, sideClasses, sortClasses, sortedVariants } from './logic.ts';
+  import { costLabel, priceLabel, sideClasses, sortClasses, sortedVariants, type ClassSide } from './logic.ts';
   import { COLLAPSED_KEY, VIEW_KEY, parseCollapsed, parseView, productTree, renameConflicts, toggleCollapsed } from './tree.ts';
   import { flattenTree } from '../stock/grouping.ts';
 
   let { params = {} }: { params?: Record<string, string>; query?: Record<string, string> } = $props();
-  const side = $derived(params.route === 'stock' ? 'stock' : 'products');
+  const side = $derived<ClassSide>(params.route === 'stock' ? 'stock' : params.route === 'expense-items' ? 'expenses' : 'products');
+  const newHref = $derived(side === 'expenses' ? '#/products/new?kind=expense' : '#/products/new');
 
   let showArchived = $state(false);
   let fieldKey = $state('');
@@ -219,26 +220,28 @@
   </table>
 {/snippet}
 
-<Header title={side === 'stock' ? 'Stock' : 'Products'}>
+<Header title={side === 'stock' ? 'Stock' : side === 'expenses' ? 'Expenses' : 'Products'}>
   {#snippet actions()}
     <button type="button" class="btn view-btn" aria-label={viewMode === 'table' ? 'Card view' : 'Table view'} onclick={switchView}>
       <Icon name={viewMode === 'table' ? 'cards' : 'table'} />
     </button>
-    <a class="btn btn-primary" href="#/products/new">+ New product</a>
+    <a class="btn btn-primary" href={newHref}>{side === 'expenses' ? '+ New expense item' : '+ New product'}</a>
   {/snippet}
 </Header>
-<TabSwitch {side} />
+<TabSwitch side={side === 'expenses' ? 'expense-items' : side} />
 
 <div class="page">
+  {#if side !== 'expenses'}
   <section class="big-actions">
     <a class="big b-add" href="#/stock/add"><Icon name="plus" size={24} />Add</a>
     <a class="big b-tr" href="#/stock/transform"><Icon name="transform" size={24} />Transform</a>
     <a class="big b-remove" href="#/stock/remove"><Icon name="minus" size={24} />Remove</a>
   </section>
+  {/if}
 
   {#if classes.length === 0}
-    <EmptyState title={side === 'stock' ? 'No raw materials, packaging or expense items yet' : 'Start by adding your first product'}>
-      <a class="btn btn-primary" href="#/products/new">+ New product</a>
+    <EmptyState title={side === 'stock' ? 'No raw materials or packaging yet' : side === 'expenses' ? 'No expense items yet' : 'Start by adding your first product'}>
+      <a class="btn btn-primary" href={newHref}>{side === 'expenses' ? '+ New expense item' : '+ New product'}</a>
     </EmptyState>
   {/if}
 
