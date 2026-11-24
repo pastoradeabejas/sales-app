@@ -5,6 +5,7 @@ import {
   priceLabel,
   moveVariant,
   parseVariantForm,
+  sideClasses,
   sortClasses,
   sortedVariants,
   validateClassName,
@@ -113,5 +114,14 @@ describe('costLabel', () => {
     expect(costLabel(v('fixed', null, 75), 1200, 2, 'kg')).toBe('€9.00');
     expect(costLabel(v('variable', null), 1200, 2, 'kg')).toBe('€12.00/kg');
     expect(costLabel(v('fixed', null, 1), null, 0, 'jar')).toBe('—');
+  });
+});
+
+describe('sideClasses (D-025)', () => {
+  const c = (id: string, sellable: boolean, trackStock = true) => ({ id, sellable, trackStock });
+  const all = [c('jar', true), c('bulk', false), c('lid', false), c('fuel', false, false), c('service', true, false)];
+  it('Products: what is sold; Stock: inventory that is not sold (bulk, packaging, expense items)', () => {
+    expect(sideClasses(all, 'products').map((x) => x.id)).toEqual(['jar', 'service']);
+    expect(sideClasses(all, 'stock').map((x) => x.id)).toEqual(['bulk', 'lid', 'fuel']);
   });
 });

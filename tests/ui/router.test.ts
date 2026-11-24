@@ -75,7 +75,7 @@ describe('tabOf', () => {
 
 describe('tab sides', () => {
   it('lists the two sides of each tab', () => {
-    expect(SIDES).toEqual({ orders: ['orders', 'clients'], expenses: ['purchases', 'suppliers'], stock: ['stock', 'recipes'] });
+    expect(SIDES).toEqual({ orders: ['orders', 'clients'], expenses: ['purchases', 'suppliers'], stock: ['products', 'stock', 'recipes'] });
   });
 
   it('builds the tab href from the remembered side', () => {
@@ -83,12 +83,13 @@ describe('tab sides', () => {
     expect(tabHref('orders', {})).toBe('#/orders');
     expect(tabHref('orders', { orders: 'clients' })).toBe('#/clients');
     expect(tabHref('expenses', { expenses: 'suppliers' })).toBe('#/suppliers');
-    expect(tabHref('stock', { stock: 'clients' })).toBe('#/stock');
+    expect(tabHref('stock', { stock: 'clients' })).toBe('#/products');
+    expect(tabHref('stock', { stock: 'stock' })).toBe('#/stock');
   });
 
   it('parses the stored sides and ignores bad input', () => {
     expect(parseSides('{"orders":"clients","stock":"recipes"}')).toEqual({ orders: 'clients', stock: 'recipes' });
-    expect(parseSides('{"stock":"products"}')).toEqual({});
+    expect(parseSides('{"stock":"products"}')).toEqual({ stock: 'products' });
     expect(parseSides('{"orders":"products","x":"y"}')).toEqual({});
     expect(parseSides('nope')).toEqual({});
     expect(parseSides(null)).toEqual({});

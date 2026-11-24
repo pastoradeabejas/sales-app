@@ -68,7 +68,7 @@ export function parseQuery(hash: string): Record<string, string> {
 export const SIDES: Record<string, string[]> = {
   orders: ['orders', 'clients'],
   expenses: ['purchases', 'suppliers'],
-  stock: ['stock', 'recipes'],
+  stock: ['products', 'stock', 'recipes'],
 };
 
 export const SIDES_KEY = 'tabSides';

@@ -16,9 +16,12 @@
   import type { ProductClass } from '../../../core/types.ts';
   import CustomFilter from './CustomFilter.svelte';
   import { filterByCustomField } from './customFilter.ts';
-  import { costLabel, priceLabel, sortClasses, sortedVariants } from './logic.ts';
+  import { costLabel, priceLabel, sideClasses, sortClasses, sortedVariants } from './logic.ts';
   import { COLLAPSED_KEY, VIEW_KEY, parseCollapsed, parseView, productTree, renameConflicts, toggleCollapsed } from './tree.ts';
   import { flattenTree } from '../stock/grouping.ts';
+
+  let { params = {} }: { params?: Record<string, string>; query?: Record<string, string> } = $props();
+  const side = $derived(params.route === 'stock' ? 'stock' : 'products');
 
   let showArchived = $state(false);
   let fieldKey = $state('');
@@ -27,7 +30,7 @@
   const sold = $derived(
     new Map<string, ClassSold>(unitsSold(app.orders, view.balances, rangeFor('month', localDate())).map((c) => [c.classId, c])),
   );
-  const classes = $derived(sortClasses(app.products));
+  const classes = $derived(sortClasses(sideClasses(app.products, side)));
   const tree = $derived(productTree(classes, fieldKey, fieldText));
   const archived = $derived(filterByCustomField(classes.filter((c) => c.archived), fieldKey, fieldText));
   const archivedCount = $derived(classes.filter((c) => c.archived).length);
@@ -216,7 +219,7 @@
   </table>
 {/snippet}
 
-<Header title="Stock">
+<Header title={side === 'stock' ? 'Stock' : 'Products'}>
   {#snippet actions()}
     <button type="button" class="btn view-btn" aria-label={viewMode === 'table' ? 'Card view' : 'Table view'} onclick={switchView}>
       <Icon name={viewMode === 'table' ? 'cards' : 'table'} />
@@ -224,7 +227,7 @@
     <a class="btn btn-primary" href="#/products/new">+ New product</a>
   {/snippet}
 </Header>
-<TabSwitch side="stock" />
+<TabSwitch {side} />
 
 <div class="page">
   <section class="big-actions">
@@ -233,8 +236,8 @@
     <a class="big b-remove" href="#/stock/remove"><Icon name="minus" size={24} />Remove</a>
   </section>
 
-  {#if app.products.length === 0}
-    <EmptyState title="Start by adding your first product">
+  {#if classes.length === 0}
+    <EmptyState title={side === 'stock' ? 'No raw materials, packaging or expense items yet' : 'Start by adding your first product'}>
       <a class="btn btn-primary" href="#/products/new">+ New product</a>
     </EmptyState>
   {/if}
