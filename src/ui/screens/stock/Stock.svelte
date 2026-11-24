@@ -109,8 +109,8 @@
             <span class="grow">
               <span class="title ellipsis">{m.title}</span>
               <span class="muted ellipsis">{m.sub}</span>
+              <span class="deltas">{#each m.deltas as d (d)}<span>{d}</span>{/each}</span>
             </span>
-            <span class="deltas">{#each m.deltas as d (d)}<span>{d}</span>{/each}</span>
           </a>
         {:else}
           <p class="muted">No movements yet.</p>
@@ -251,13 +251,12 @@
     background: var(--owed-tag);
     color: var(--owed-on-bg);
   }
+  /* Under the title, full width: product names can be long (D-015). */
   .deltas {
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
-    font-size: 14px;
-    font-weight: 700;
-    text-align: right;
+    font-size: var(--fs-small);
+    font-weight: 600;
   }
   .new {
     min-height: var(--tap);
