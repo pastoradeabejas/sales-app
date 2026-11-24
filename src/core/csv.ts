@@ -59,7 +59,7 @@ export function clientsCsv(clients: Client[], balances: Map<string, ClientBalanc
   );
 }
 
-/** Stock export: one row per movement; a transform gives "transform in" and "transform out" rows. */
+/** Stock export: one row per movement; a transform gives "transform out" rows (inputs) and "transform in" rows (outputs), as in §8.12. */
 export function stockCsv(events: StockEvent[], classesById: Map<string, ProductClass>): string {
   const row = (e: StockEvent, type: string, classId: string, amount: number, cost: UnitCost | null, reason: string): Cell[] => {
     const c = classesById.get(classId);
@@ -69,7 +69,7 @@ export function stockCsv(events: StockEvent[], classesById: Map<string, ProductC
     ['event_id', 'date', 'type', 'class', 'amount', 'unit', 'unit_cost_eur', 'reason', 'note', 'voided'],
     events.flatMap((e) =>
       e.type === 'transform'
-        ? [...e.inputs.map((x) => row(e, 'transform in', x.classId, x.amount, null, '')), ...e.outputs.map((x) => row(e, 'transform out', x.classId, x.amount, null, ''))]
+        ? [...e.inputs.map((x) => row(e, 'transform out', x.classId, x.amount, null, '')), ...e.outputs.map((x) => row(e, 'transform in', x.classId, x.amount, null, ''))]
         : [row(e, e.type, e.classId, e.amount, e.unitCost, e.reason)],
     ),
   );

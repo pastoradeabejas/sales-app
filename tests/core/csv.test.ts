@@ -70,8 +70,8 @@ describe('exports', () => {
     expect(out[0]).toBe('event_id,date,type,class,amount,unit,unit_cost_eur,reason,note,voided');
     expect(out[1]).toBe('e1,2026-11-01,add,Milk,1.5,kg,0.005,,n,false');
     expect(out[2]).toBe('e2,2026-11-02,remove,Milk,0.25,kg,,Waste,,true');
-    expect(out[3]).toBe('e3,2026-11-03,transform in,Milk,1,kg,,,,false');
-    expect(out[4]).toBe('e3,2026-11-03,transform out,Milk,20,kg,,,,false');
+    expect(out[3]).toBe('e3,2026-11-03,transform out,Milk,1,kg,,,,false');
+    expect(out[4]).toBe('e3,2026-11-03,transform in,Milk,20,kg,,,,false');
   });
   it('stockCsv: a grouped class shows its full name', () => {
     const grouped = { ...cls, id: 'c2', name: '500g Jar', group: 'Honey/Rosemary' } as ProductClass;
