@@ -183,13 +183,6 @@ export function signedAmount(delta: Scaled, cls: ProductClass): string {
   return `${delta >= 0 ? '+' : ''}${formatAmount(delta, cls.unit.decimals, cls.unit.name)}`;
 }
 
-/** "−500 kg · transform · today". */
-export function lastMovementText(m: Movement | null, cls: ProductClass, today: string): string {
-  if (!m) return 'No movements yet';
-  const kind = m.kind.startsWith('transform') ? 'transform' : m.kind;
-  return `${signedAmount(m.delta, cls)} · ${kind} · ${dayLabel(m.date, today)}`;
-}
-
 /** Days left for sellable classes (§4.3): "≈ 23 days", "not enough data", or '' for raw materials. */
 export function daysLeftText(cls: ProductClass, stock: Scaled, rate: { perDay: number; enoughData: boolean }): string {
   if (!cls.sellable) return '';

@@ -12,7 +12,6 @@ import {
   daysLeftText,
   editRow,
   equalPercents,
-  lastMovementText,
   movementLabel,
   movePreview,
   percentsToShares,
@@ -232,11 +231,6 @@ describe('labels and texts', () => {
   it('movement labels', () => {
     expect(milkT.map((m) => movementLabel(m, byId))).toEqual(['Add', 'Remove (waste)', 'Transform out (to Yogurt)']);
     expect(yogT.map((m) => movementLabel(m, byId))).toEqual(['Transform in (from Milk)', 'Sale (Lucía)']);
-  });
-  it('last movement text', () => {
-    expect(lastMovementText(milkT[2], milk, today)).toBe('−500 kg · transform · today');
-    expect(lastMovementText(milkT[0], milk, today)).toBe('+1,020 kg · add · 10 Nov');
-    expect(lastMovementText(null, milk, today)).toBe('No movements yet');
   });
   it('days left only for sellable classes', () => {
     expect(daysLeftText(milk, 100, { perDay: 10, enoughData: true })).toBe('');

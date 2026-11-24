@@ -4,15 +4,16 @@
   import Tag from '../../components/Tag.svelte';
   import Sheet from '../../components/Sheet.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
-  import { app, view, localDate, saveClass } from '../../data.svelte.ts';
+  import { app, view, localDate, saveClass, saveRecipe } from '../../data.svelte.ts';
   import { go } from '../../router.svelte.ts';
   import { showToast } from '../../toast.svelte.ts';
-  import { formatUnitCost } from '../../../core/money.ts';
   import { formatAmount } from '../../../core/quantity.ts';
   import { isLowStock } from '../../../core/stock.ts';
   import { rangeFor, unitsSold, type ClassSold } from '../../../core/stats.ts';
   import { fullName, normalizeGroup, renameGroup, type GroupNode } from '../../../core/groups.ts';
-  import type { ProductClass } from '../../../core/types.ts';
+  import type { ProductClass, Recipe } from '../../../core/types.ts';
+  import RecipeSheet from '../stock/RecipeSheet.svelte';
+  import { activeRecipes, recipeNameError, transformSummary } from '../stock/logic.ts';
   import CustomFilter from './CustomFilter.svelte';
   import { filterByCustomField } from './customFilter.ts';
   import { priceLabel, sortClasses, sortedVariants } from './logic.ts';
@@ -29,6 +30,26 @@
   const tree = $derived(productTree(classes, fieldKey, fieldText));
   const archived = $derived(filterByCustomField(classes.filter((c) => c.archived), fieldKey, fieldText));
   const archivedCount = $derived(classes.filter((c) => c.archived).length);
+
+  // Recipes (moved here from Stock): list, edit, use, restore archived.
+  const recipes = $derived(activeRecipes(app.recipes));
+  const archivedRecipes = $derived(app.recipes.filter((r) => r.archived).sort((a, b) => a.name.localeCompare(b.name)));
+  let showArchivedRecipes = $state(false);
+  let sheetOpen = $state(false);
+  let editing = $state<Recipe | null>(null);
+  function openSheet(r: Recipe | null) {
+    editing = r;
+    sheetOpen = true;
+  }
+  async function restore(r: Recipe) {
+    if (recipeNameError(r.name, app.recipes, r.id)) {
+      showToast(`Rename first: another recipe is called ${r.name}`);
+      openSheet(r);
+      return;
+    }
+    await saveRecipe({ ...r, archived: false });
+    showToast(`Restored ${r.name}`);
+  }
 
   // Collapsed groups, kept per device.
   function readCollapsed(): string[] {
@@ -88,37 +109,24 @@
 {#snippet card(c: ProductClass, label: string)}
   {@const snap = view.snapshot.get(c.id)}
   {@const s = sold.get(c.id)}
-  <section class="card" class:archived={c.archived}>
-    <a class="head" href="#/products/{c.id}" aria-label="Edit {fullName(c)}">
-      <span class="row-between">
-        <h2>{label}</h2>
-        <span class="muted">
-          {c.unit.name}{#if c.trackStock && snap} · {formatAmount(snap.stock, c.unit.decimals, c.unit.name)} in stock{/if}
-        </span>
-      </span>
-      <span class="tags">
+  <a class="card pcard" class:archived={c.archived} href="#/products/{c.id}" aria-label="Edit {fullName(c)}">
+    <div class="row-between">
+      <span class="name">
+        <span class="title">{label}</span>
         {#if c.archived}<Tag>Archived</Tag>{/if}
-        {#if !c.sellable}<Tag>Raw material</Tag>{/if}
+        {#if !c.sellable}<Tag>raw material</Tag>{/if}
         {#if c.trackStock && snap && isLowStock(c, snap.stock)}<Tag tone="low">Low</Tag>{/if}
-        <span class="muted">Sold this month: {formatAmount(s?.amount ?? 0, c.unit.decimals, c.unit.name)}</span>
       </span>
-    </a>
-
+      {#if c.trackStock && snap}<span class="qty">{formatAmount(snap.stock, c.unit.decimals, c.unit.name)}</span>{/if}
+    </div>
+    <span class="muted">Sold this month: {formatAmount(s?.amount ?? 0, c.unit.decimals, c.unit.name)}</span>
     {#if c.variants.length}
-      <div class="table" role="table" aria-label="Variants of {fullName(c)}">
-        <div class="tr th" role="row">
-          <span role="columnheader">Variant</span><span role="columnheader">Price</span>
-          <span role="columnheader">Cost</span><span role="columnheader">Sold</span>
-        </div>
+      <div class="variants" role="table" aria-label="Variants of {fullName(c)}">
         {#each sortedVariants(c.variants) as v (v.id)}
           {@const vs = s?.variants.find((x) => x.variantId === v.id)}
-          <div class="tr" class:greyed={v.archived} role="row">
+          <div class="vrow" class:greyed={v.archived} role="row">
             <span role="cell" class="lbl">{v.label}{v.archived ? ' · archived' : ''}</span>
-            <span role="cell">
-              {priceLabel(v, c.unit.name)}
-              {#if v.price === 0}<Tag>free</Tag>{/if}
-            </span>
-            <span role="cell">{v.cost === null ? '—' : formatUnitCost(v.cost)}</span>
+            <span role="cell">{priceLabel(v, c.unit.name)}{#if v.price === 0} <Tag>free</Tag>{/if}</span>
             <span role="cell" class="amount">
               {v.kind === 'fixed' ? (vs?.quantity ?? 0) : formatAmount(vs?.amount ?? 0, c.unit.decimals, c.unit.name)}
             </span>
@@ -126,9 +134,9 @@
         {/each}
       </div>
     {:else}
-      <p class="muted none">{c.sellable ? 'No variants yet' : 'Not sold · used in transforms'}</p>
+      <span class="muted">{c.sellable ? 'No variants yet' : 'Not sold · used in transforms'}</span>
     {/if}
-  </section>
+  </a>
 {/snippet}
 
 {#snippet node(n: GroupNode<ProductClass>)}
@@ -137,8 +145,8 @@
     <div class="group">
       <div class="ghead">
         <button type="button" class="gtoggle grow" aria-expanded={open} onclick={() => toggle(g.path)}>
-          <span class="chev" class:open><Icon name="chevron" size={18} /></span>
-          <span class="gname ellipsis">{g.name}</span>
+          <Icon name={open ? 'up' : 'down'} size={18} />
+          <span class="title ellipsis grow">{g.name}</span>
           <span class="muted">{g.count}</span>
         </button>
         <button type="button" class="icon" aria-label="Group {g.name} actions" onclick={() => openMenu(g.path)}>
@@ -179,7 +187,48 @@
       {showArchived ? 'Hide archived' : `Show archived (${archivedCount})`}
     </button>
   {/if}
+
+  <section class="card">
+    <div class="section-head">
+      <h2>Recipes</h2>
+      <button type="button" class="btn-ghost new" onclick={() => openSheet(null)}>+ New</button>
+    </div>
+    <div class="list">
+      {#each recipes as r (r.id)}
+        <div class="list-row">
+          <span class="grow">
+            <span class="title">{r.name}</span>
+            <span class="muted">{transformSummary(r.inputs, r.outputs, view.classesById)}</span>
+          </span>
+          <button type="button" class="edit" aria-label="Edit {r.name}" onclick={() => openSheet(r)}>Edit</button>
+          <a class="use" href="#/stock/transform?recipe={r.id}" aria-label="Use {r.name}">Use</a>
+        </div>
+      {:else}
+        <p class="muted">No recipes yet. Tick "Save as recipe" on a transform to keep one.</p>
+      {/each}
+    </div>
+    {#if archivedRecipes.length}
+      <button type="button" class="btn-ghost toggle" aria-expanded={showArchivedRecipes} onclick={() => (showArchivedRecipes = !showArchivedRecipes)}>
+        {showArchivedRecipes ? 'Hide' : 'Show'} archived recipes ({archivedRecipes.length})
+      </button>
+      {#if showArchivedRecipes}
+        <div class="list">
+          {#each archivedRecipes as r (r.id)}
+            <div class="list-row">
+              <span class="grow">
+                <span class="title">{r.name}</span>
+                <span class="muted">{transformSummary(r.inputs, r.outputs, view.classesById)}</span>
+              </span>
+              <button type="button" class="edit" aria-label="Restore {r.name}" onclick={() => restore(r)}>Restore</button>
+            </div>
+          {/each}
+        </div>
+      {/if}
+    {/if}
+  </section>
 </div>
+
+<RecipeSheet bind:open={sheetOpen} recipe={editing} />
 
 <Sheet bind:open={menuOpen} title={menuPath.split('/').join(' - ')}>
   {#if renaming}
@@ -208,41 +257,40 @@
 </Sheet>
 
 <style>
-  .head {
+  .pcard {
     display: grid;
-    gap: 4px;
-    color: inherit;
+    gap: 6px;
+    padding: 14px 16px;
+    color: var(--ink);
     text-decoration: none;
-    min-height: var(--tap);
   }
-  h2 {
-    margin: 0;
+  .pcard .row-between {
+    align-items: center;
   }
-  .tags {
+  .name {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
+    min-width: 0;
   }
-  .table {
-    margin-top: 8px;
+  .qty {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
   }
-  .tr {
+  .vrow {
     display: grid;
-    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 0.8fr);
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.2fr) minmax(0, 0.6fr);
     gap: 6px;
     align-items: center;
-    padding: 10px 0;
+    padding: 6px 0;
     border-top: 1px solid var(--divider);
     font-size: var(--fs-small);
   }
-  .tr > span:nth-child(n + 2) {
+  .vrow > span:nth-child(n + 2) {
     text-align: right;
-  }
-  .th {
-    color: var(--muted);
-    border-top: 0;
-    padding-bottom: 2px;
   }
   .lbl {
     font-weight: 500;
@@ -254,18 +302,18 @@
   .archived {
     opacity: 0.8;
   }
-  .none {
-    margin: 8px 0 0;
-  }
-  .group {
+  .group,
+  .nested {
     display: grid;
-    gap: 12px;
+    gap: 8px;
+  }
+  .nested {
+    padding-left: 12px;
   }
   .ghead {
     display: flex;
     align-items: center;
     gap: 4px;
-    border-bottom: 1px solid var(--divider);
   }
   .gtoggle {
     display: flex;
@@ -273,31 +321,13 @@
     gap: 8px;
     min-width: 0;
     min-height: var(--tap);
-    padding: 0;
+    padding: 0 4px;
     border: 0;
     background: none;
-    color: inherit;
+    color: var(--ink);
     font: inherit;
     text-align: left;
     cursor: pointer;
-  }
-  .gname {
-    font-weight: 700;
-    font-size: var(--fs-section);
-  }
-  .chev {
-    display: inline-grid;
-    color: var(--muted);
-    transition: transform 0.15s;
-  }
-  .chev.open {
-    transform: rotate(90deg);
-  }
-  .nested {
-    display: grid;
-    gap: 12px;
-    padding-left: 14px;
-    border-left: 2px solid var(--divider);
   }
   .icon {
     display: grid;
@@ -315,7 +345,39 @@
     display: grid;
     gap: 12px;
   }
+  h2,
   p {
     margin: 0;
+  }
+  .new,
+  .toggle {
+    min-height: var(--tap);
+    font-weight: 600;
+  }
+  .new {
+    display: inline-flex;
+    align-items: center;
+  }
+  .toggle {
+    padding: 0;
+  }
+  .edit,
+  .use {
+    min-height: var(--tap);
+    padding: 0 14px;
+    border-radius: 10px;
+    font-weight: 600;
+  }
+  .edit {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--ink);
+  }
+  .use {
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
   }
 </style>
