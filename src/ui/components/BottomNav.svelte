@@ -15,7 +15,10 @@
 </script>
 
 <nav aria-label="Main">
-  <span class="brand">{config.appName}</span>
+  <span class="brand">
+    <img src="{import.meta.env.BASE_URL}favicon.svg" alt="" width="28" height="28" />
+    {config.appName}
+  </span>
   {#each tabs as { tab, label } (tab)}
     <a href="#/{tab}" aria-current={tab === active ? 'page' : undefined}>
       <Icon name={tab} size={22} />
@@ -67,7 +70,9 @@
       border-right: 1px solid var(--border);
     }
     .brand {
-      display: block;
+      display: flex;
+      align-items: center;
+      gap: 10px;
       padding: 4px 12px 16px;
       font-size: var(--fs-section);
       font-weight: 700;
