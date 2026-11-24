@@ -13,9 +13,12 @@ import type {
   Payment,
   PaymentMethod,
   ProductClass,
+  Purchase,
   Recipe,
   RecordType,
   StockEvent,
+  Supplier,
+  WorkLevel,
 } from '../core/types.ts';
 import { loadDemo } from '../store/demo.ts';
 import { idbBackend } from '../store/idb.ts';
@@ -41,6 +44,9 @@ export const app = $state({
   payments: [] as Payment[],
   stock: [] as StockEvent[],
   recipes: [] as Recipe[],
+  suppliers: [] as Supplier[],
+  purchases: [] as Purchase[],
+  levels: [] as WorkLevel[],
   outboxCount: 0,
 });
 
@@ -81,7 +87,7 @@ async function reload(stores: StoreName[]) {
   stores.forEach((s, i) => ((app as Record<StoreName, unknown>)[s] = loaded[i]));
 }
 
-const RECORD_STORES: StoreName[] = ['products', 'clients', 'orders', 'payments', 'stock', 'recipes'];
+const RECORD_STORES: StoreName[] = ['products', 'clients', 'orders', 'payments', 'stock', 'recipes', 'suppliers', 'purchases', 'levels'];
 
 /** Opens IndexedDB (memory if unavailable) and loads every record. */
 export async function initData() {

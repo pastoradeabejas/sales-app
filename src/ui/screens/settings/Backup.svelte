@@ -33,6 +33,9 @@
       payments: app.payments,
       stock: app.stock,
       recipes: app.recipes,
+      suppliers: app.suppliers,
+      purchases: app.purchases,
+      levels: app.levels,
     };
     download(`sales-backup-${localDate()}.json`, makeBackup($state.snapshot(records), now), 'application/json');
     updateSettings({ lastBackupAt: now });

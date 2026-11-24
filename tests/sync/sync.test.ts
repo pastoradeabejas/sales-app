@@ -60,7 +60,7 @@ describe('pull (§6.3)', () => {
     expect(maxInFlight).toBe(6);
     expect(await store.getMeta('lastSyncedCommitSha')).toBe('c1');
     expect(await store.getMeta('lastSyncAt')).toBe(NOW);
-    expect(await store.getMeta('schemaVersion')).toBe(1);
+    expect(await store.getMeta('schemaVersion')).toBe(2);
   });
 
   it('makes exactly 1 request when nothing changed', async () => {
@@ -121,10 +121,10 @@ describe('pull (§6.3)', () => {
   });
 
   it('records a newer meta.json schema (read-only)', async () => {
-    const fake = fakeGitHub({ 'meta.json': '{"app":"sales-bookkeeping","schemaVersion":2}\n' });
+    const fake = fakeGitHub({ 'meta.json': '{"app":"sales-bookkeeping","schemaVersion":3}\n' });
     const { deps, store } = device(fake);
     expect((await pull(deps)).readOnly).toBe(true);
-    expect(await store.getMeta('schemaVersion')).toBe(2);
+    expect(await store.getMeta('schemaVersion')).toBe(3);
   });
 });
 
@@ -229,7 +229,7 @@ describe('push (§6.2)', () => {
     const fake = fakeGitHub();
     const { deps, store } = device(fake);
     await store.save('client', client('c1', 'Marta'), 'clients/c1.json');
-    await store.setMeta('schemaVersion', 2);
+    await store.setMeta('schemaVersion', 3);
     expect((await pushOutbox(deps)).stopped).toBe('readOnly');
     expect(fake.requests).toHaveLength(0);
   });

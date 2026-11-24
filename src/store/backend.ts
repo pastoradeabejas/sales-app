@@ -1,7 +1,7 @@
 // Storage backend contract and the IndexedDB schema (spec §5), shared by idb.ts and memory.ts.
 
 /** Object stores holding records. */
-export type StoreName = 'products' | 'clients' | 'orders' | 'payments' | 'stock' | 'recipes';
+export type StoreName = 'products' | 'clients' | 'orders' | 'payments' | 'stock' | 'recipes' | 'suppliers' | 'purchases' | 'levels';
 /** Every object store, including sync bookkeeping. */
 export type TableName = StoreName | 'files' | 'outbox' | 'meta';
 export type Key = string | number;
@@ -37,7 +37,7 @@ export interface TableDef {
 
 /** Database name and version (spec §5). */
 export const DB_NAME = 'sales-bookkeeping';
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
 const idx = (...names: string[]): IndexDef[] => names.map((name) => ({ name, keyPath: name }));
 
@@ -49,6 +49,9 @@ export const SCHEMA: Record<TableName, TableDef> = {
   payments: { keyPath: 'id', indexes: idx('orderId', 'clientId', 'date') },
   stock: { keyPath: 'id', indexes: [...idx('classId', 'date'), { name: 'classIds', keyPath: 'classIds', multiEntry: true }] },
   recipes: { keyPath: 'id', indexes: [] },
+  suppliers: { keyPath: 'id', indexes: [] },
+  purchases: { keyPath: 'id', indexes: [...idx('supplierId', 'date'), { name: 'classIds', keyPath: 'classIds', multiEntry: true }] },
+  levels: { keyPath: 'id', indexes: [] },
   files: { keyPath: 'path', indexes: idx('recordId') },
   outbox: { keyPath: 'seq', autoIncrement: true, indexes: idx('path', 'recordId') },
   meta: { keyPath: 'key', indexes: [] },

@@ -1,6 +1,6 @@
 // JSON backup export / import (spec §8.1): file format, validation and restore plan.
 import { SCHEMA_VERSION } from './types.ts';
-import type { Client, Order, Payment, ProductClass, Recipe, RecordType, StockEvent } from './types.ts';
+import type { Client, Order, Payment, ProductClass, Purchase, Recipe, RecordType, StockEvent, Supplier, WorkLevel } from './types.ts';
 
 export interface Backup {
   app: 'sales-bookkeeping';
@@ -13,6 +13,9 @@ export interface Backup {
     payments: Payment[];
     stock: StockEvent[];
     recipes: Recipe[];
+    suppliers: Supplier[];
+    purchases: Purchase[];
+    levels: WorkLevel[];
   };
 }
 
@@ -22,7 +25,10 @@ type AnyRecord = Records[keyof Records][number];
 // Backup key -> record type, in restore order.
 const TYPES: [keyof Records, RecordType][] = [
   ['products', 'product'], ['clients', 'client'], ['orders', 'order'], ['payments', 'payment'], ['stock', 'stock'], ['recipes', 'recipe'],
+  ['suppliers', 'supplier'], ['purchases', 'purchase'], ['levels', 'level'],
 ];
+// Lists added in v1.4: a backup without them restores them as empty.
+const OPTIONAL = new Set<keyof Records>(['suppliers', 'purchases', 'levels']);
 
 /** Pretty JSON of every record, stamped with the export time. */
 export function makeBackup(records: Records, now: string): string {
@@ -43,6 +49,7 @@ export function parseBackup(text: string): { ok: true; backup: Backup } | { ok: 
   if (data?.app !== 'sales-bookkeeping' || typeof data.schemaVersion !== 'number') return fail('Not a Sales Book backup');
   if (data.schemaVersion > SCHEMA_VERSION) return fail('Backup is from a newer app version');
   for (const [key] of TYPES) {
+    if (OPTIONAL.has(key) && data.records && data.records[key] === undefined) data.records[key] = [];
     const list = data.records?.[key];
     if (!Array.isArray(list)) return fail(`Backup is missing ${key}`);
     if (list.some((r) => !r || typeof r.id !== 'string' || typeof r.createdAt !== 'string' || typeof r.updatedAt !== 'string')) {
@@ -66,7 +73,7 @@ export function restorePlan(backup: Backup, existing: Map<string, string>): { ty
 
 /** Records per type in a plan, for "Restore 40 orders, 12 clients…". */
 export function restoreCounts(plan: { type: RecordType }[]): Record<RecordType, number> {
-  const counts: Record<RecordType, number> = { product: 0, client: 0, order: 0, payment: 0, stock: 0, recipe: 0 };
+  const counts: Record<RecordType, number> = { product: 0, client: 0, order: 0, payment: 0, stock: 0, recipe: 0, supplier: 0, purchase: 0, level: 0 };
   for (const p of plan) counts[p.type]++;
   return counts;
 }
