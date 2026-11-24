@@ -25,7 +25,7 @@
 
   $effect(() => {
     if (open) {
-      text = value ? formatAmount(value, decimals, undefined, { fixed: true }).replaceAll(',', '') : '';
+      text = value ? formatAmount(value, decimals).replaceAll(',', '') : '';
       error = '';
     }
   });

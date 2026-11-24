@@ -44,7 +44,7 @@
   function qtyText(l: OrderLine): string {
     return l.kind === 'fixed'
       ? `${l.quantity} × ${formatMoney(l.unitPrice)}`
-      : `${formatAmount(l.amount, l.decimals, l.unitName, { fixed: true })} × ${formatMoney(l.unitPrice)}/${l.unitName}`;
+      : `${formatAmount(l.amount, l.decimals, l.unitName)} × ${formatMoney(l.unitPrice)}/${l.unitName}`;
   }
 
   function askVoidPayment(p: Payment) {

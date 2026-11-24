@@ -79,7 +79,7 @@
     <Stepper bind:value={() => qty, (v) => onqty(v)} label={name} />
   {:else}
     <button type="button" class="btn amount-btn" class:set={qty > 0} onclick={() => (amountOpen = true)}>
-      {qty > 0 ? formatAmount(qty, cls.unit.decimals, cls.unit.name, { fixed: true }) : `Add ${cls.unit.name}`}
+      {qty > 0 ? formatAmount(qty, cls.unit.decimals, cls.unit.name) : `Add ${cls.unit.name}`}
     </button>
   {/if}
 </div>
