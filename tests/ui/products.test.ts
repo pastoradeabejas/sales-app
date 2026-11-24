@@ -102,6 +102,12 @@ describe('priceLabel', () => {
 });
 
 describe('costLabel', () => {
+  it('rounds up to whole cents for readability (D-030)', () => {
+    expect(costLabel(null, 687.0241, 0, 'pcs')).toBe('€6.88/pcs');
+    expect(costLabel(null, 602.6367, 0, 'pcs')).toBe('€6.03/pcs');
+    expect(costLabel(null, 18.125, 0, 'pot')).toBe('€0.19/pot');
+    expect(costLabel(null, 15, 0, 'pcs')).toBe('€0.15/pcs');
+  });
   const v = (kind: 'fixed' | 'variable', cost: number | null, baseAmount: number | null = null) => ({ kind, cost, baseAmount });
   it('shows the class average per unit, or a dash when unknown', () => {
     expect(costLabel(null, 15, 0, 'pcs')).toBe('€0.15/pcs');

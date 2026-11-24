@@ -1,7 +1,7 @@
 import { normalizeName } from '../../../core/clients.ts';
 import { normalizeGroup } from '../../../core/groups.ts';
 import { parseAmount } from '../../../core/quantity.ts';
-import { formatMoney, formatUnitCost, parseMoney, parseUnitCost } from '../../../core/money.ts';
+import { formatMoney, parseMoney, parseUnitCost } from '../../../core/money.ts';
 import { saleUnitCost } from '../../../core/orders.ts';
 import type { Cents, Decimals, UnitCost, Variant, VariantKind } from '../../../core/types.ts';
 
@@ -128,5 +128,6 @@ export function costLabel(
   unitName: string,
 ): string {
   const cost = v ? saleUnitCost(v, avg, decimals) : avg;
-  return cost === null ? '—' : formatUnitCost(cost) + (!v || v.kind === 'variable' ? `/${unitName}` : '');
+  // Rounded up to whole cents for readability (D-030); the stored cost keeps 4 decimals.
+  return cost === null ? '—' : formatMoney(Math.ceil(Number(cost.toPrecision(12)))) + (!v || v.kind === 'variable' ? `/${unitName}` : '');
 }
