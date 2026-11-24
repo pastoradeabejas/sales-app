@@ -11,6 +11,8 @@ import {
   groupByDay,
   matchClients,
   newestMonths,
+  addedGroups,
+  pickerGroups,
   productGroups,
   recentClients,
   shortDay,
@@ -329,5 +331,21 @@ describe('clients', () => {
     expect(matchClients(clients, 'a').map((c) => c.id)).toEqual(['ana', 'lucia', 'marta', 'pablo']);
     expect(matchClients(clients, 'olga')).toEqual([]);
     expect(matchClients(clients, ' ')).toEqual([]);
+  });
+});
+
+describe('order form shows only the added products (D-026)', () => {
+  const groups = productGroups(classes, [], new Set());
+  it('keeps only added variants, and classes that have one', () => {
+    expect(addedGroups(groups, new Set(['pcut'])).map((g) => [g.cls.id, g.variants.map((v) => v.id)])).toEqual([['cheese', ['pcut']]]);
+    expect(addedGroups(groups, new Set())).toEqual([]);
+  });
+  it('picker search matches product or variant names, accent- and case-insensitive', () => {
+    expect(pickerGroups(groups, '').map((g) => g.cls.id)).toEqual(['cheese', 'cpu']);
+    expect(pickerGroups(groups, 'ryzen').map((g) => g.cls.id)).toEqual(['cpu']);
+    const byLabel = pickerGroups(groups, '5600');
+    expect(byLabel.map((g) => [g.cls.id, g.variants.map((v) => v.id)])).toEqual([['cpu', ['r5600']]]);
+    expect(pickerGroups(groups, 'PARMIGIANO')[0].variants.length).toBe(groups[0].variants.length);
+    expect(pickerGroups(groups, 'zzz')).toEqual([]);
   });
 });

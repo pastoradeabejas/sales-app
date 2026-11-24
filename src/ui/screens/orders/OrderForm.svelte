@@ -5,8 +5,9 @@
   import Header from '../../components/Header.svelte';
   import Sheet from '../../components/Sheet.svelte';
   import Segmented from '../../components/Segmented.svelte';
+  import SearchField from '../../components/SearchField.svelte';
   import StatusTag from '../../components/StatusTag.svelte';
-  import { buildTree } from '../../../core/groups.ts';
+  import { buildTree, fullName } from '../../../core/groups.ts';
   import { formatMoney, parseMoney } from '../../../core/money.ts';
   import { isFutureDate, orderTotal, startFromPicks, unitSummary, validateOrder } from '../../../core/orders.ts';
   import { newOrderPayment, previewNewOrder } from '../../../core/payments.ts';
@@ -24,9 +25,11 @@
   import VariantRow from './VariantRow.svelte';
   import { dateButtonLabel } from './polish.ts';
   import {
+    addedGroups,
     creditMoved,
     draftFromOrder,
     draftLines,
+    pickerGroups,
     productGroups,
     shortDay,
     skippedNote,
@@ -62,19 +65,27 @@
   let warnText = $state('');
   let busy = $state(false);
   let dateOpen = $state(false);
+  // Only the products added to this order are listed; "+ Add product" picks more (D-026).
+  const withQty = (d: Draft) => Object.keys(d.qty).filter((id) => (d.qty[id] ?? 0) > 0);
+  // svelte-ignore state_referenced_locally
+  let added = $state(new Set<Id>([...(prev?.lines.map((l) => l.variantId) ?? []), ...withQty(draft)]));
+  let pickOpen = $state(false);
+  let pickText = $state('');
 
   const client = $derived(view.clientsById.get(clientId));
   const picks = $derived(clientId ? startFromPicks(app.orders, clientId) : []);
   const index = $derived(variantIndex(app.products));
   const include = $derived(new Set([...(prev?.lines.map((l) => l.variantId) ?? []), ...Object.keys(draft.qty)]));
   const groups = $derived(productGroups(app.products, app.orders, include));
-  const tree = $derived(buildTree(groups.map((g) => ({ name: g.cls.name, group: g.cls.group, g }))));
+  const shown = $derived(addedGroups(groups, added));
+  const tree = $derived(buildTree(shown.map((g) => ({ name: g.cls.name, group: g.cls.group, g }))));
+  const pickList = $derived(pickerGroups(groups, pickText));
   let collapsed = $state(loadCollapsed(localStorage, 'orderCollapsed'));
   const rows = $derived(
     flattenTree(tree, {
       collapsed,
       force: (x) => x.g.variants.some((v) => (draft.qty[v.id] ?? 0) > 0),
-      order: (a, b) => groups.indexOf(a.g) - groups.indexOf(b.g),
+      order: (a, b) => shown.indexOf(a.g) - shown.indexOf(b.g),
     }),
   );
   function toggle(path: string) {
@@ -115,6 +126,7 @@
   function use(o: Order) {
     const r = draftFromOrder(o, view.classesById, true);
     draft = r.draft;
+    added = new Set(withQty(r.draft));
     skipped = r.skipped;
     startedFrom = o;
     step = 'form';
@@ -122,9 +134,17 @@
 
   function custom() {
     draft = emptyDraft();
+    added = new Set();
     skipped = [];
     startedFrom = null;
     step = 'form';
+  }
+
+  function addVariant(v: { id: Id; kind: string }) {
+    added = new Set([...added, v.id]);
+    if (v.kind === 'fixed' && !(draft.qty[v.id] > 0)) draft.qty[v.id] = 1;
+    pickOpen = false;
+    pickText = '';
   }
 
   function stockText(classId: Id): string {
@@ -250,7 +270,10 @@
       </section>
       {/if}
     {/each}
-    {#if groups.length}<p class="hint">Tap a price to change it for this order only.</p>{/if}
+    {#if groups.length}
+      <button type="button" class="btn btn-block add-product" onclick={() => (pickOpen = true)}>+ Add product</button>
+      {#if shown.length}<p class="hint">Tap a price to change it for this order only.</p>{/if}
+    {/if}
 
     <div class="field">
       <label for="order-note">Note</label>
@@ -292,6 +315,25 @@
   </footer>
 {/if}
 
+<Sheet bind:open={pickOpen} title="Add product">
+  <SearchField bind:value={pickText} label="Search products" placeholder="Search product or size" />
+  <div class="pick-list">
+    {#each pickList as g (g.cls.id)}
+      <section>
+        <h3>{fullName(g.cls)} <span class="muted">{stockText(g.cls.id)}</span></h3>
+        {#each g.variants as v (v.id)}
+          <button type="button" class="pick" class:on={added.has(v.id)} onclick={() => addVariant(v)}>
+            <span class="grow">{v.label}</span>
+            <span class="muted">{formatMoney(v.price)}{v.kind === 'variable' ? `/${g.cls.unit.name}` : ''}</span>
+          </button>
+        {/each}
+      </section>
+    {:else}
+      <p class="muted">No products match.</p>
+    {/each}
+  </div>
+</Sheet>
+
 <Sheet bind:open={dateOpen} title="Order date">
   <div class="field">
     <label for="order-date">Date</label>
@@ -308,6 +350,37 @@
 </ConfirmSheet>
 
 <style>
+  .add-product {
+    font-weight: 600;
+  }
+  .pick-list {
+    display: grid;
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .pick-list h3 {
+    margin: 0 0 4px;
+    font-size: var(--fs-small);
+    font-weight: 600;
+  }
+  .pick {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: var(--tap);
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--surface);
+    color: var(--ink);
+    font: inherit;
+    text-align: left;
+    margin-bottom: 6px;
+  }
+  .pick.on {
+    border-color: var(--accent);
+  }
   .date-btn {
     min-height: var(--tap);
     font-size: var(--fs-small);

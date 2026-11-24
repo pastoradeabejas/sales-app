@@ -176,6 +176,20 @@ export function productGroups(classes: ProductClass[], orders: Order[], include:
     .sort((a, b) => recent(a.cls, b.cls) || fullName(a.cls).localeCompare(fullName(b.cls)));
 }
 
+/** The order form lists only the variants added to this order (D-026). */
+export function addedGroups(groups: ProductGroup[], added: Set<Id>): ProductGroup[] {
+  return groups.map((g) => ({ ...g, variants: g.variants.filter((v) => added.has(v.id)) })).filter((g) => g.variants.length > 0);
+}
+
+/** "+ Add product" picker: a class matching the search keeps all its variants, else only matching variants. */
+export function pickerGroups(groups: ProductGroup[], text: string): ProductGroup[] {
+  const q = normalizeName(text);
+  if (!q) return groups;
+  return groups
+    .map((g) => (normalizeName(fullName(g.cls)).includes(q) ? g : { ...g, variants: g.variants.filter((v) => normalizeName(v.label).includes(q)) }))
+    .filter((g) => g.variants.length > 0);
+}
+
 /** Stock change per class of saving these lines; an edited order's old lines are given back. */
 export function stockDelta(lines: OrderLine[], oldLines: OrderLine[] = []): Map<Id, Scaled> {
   const delta = new Map<Id, Scaled>();
