@@ -4,7 +4,7 @@
   import { go, rememberSide } from '../router.svelte.ts';
   import { SIDES, tabOf, type RouteName } from '../router.ts';
 
-  let { side }: { side: 'orders' | 'clients' | 'purchases' | 'suppliers' | 'stock' | 'products' } = $props();
+  let { side }: { side: 'orders' | 'clients' | 'purchases' | 'suppliers' | 'stock' | 'recipes' } = $props();
 
   const labels: Record<string, string> = {
     orders: 'Orders',
@@ -12,7 +12,7 @@
     purchases: 'Purchases',
     suppliers: 'Suppliers',
     stock: 'Stock',
-    products: 'Products',
+    recipes: 'Recipes',
   };
   const tab = $derived(tabOf(side as RouteName));
   const options = $derived(SIDES[tab].map((s) => ({ value: s, label: labels[s] })));

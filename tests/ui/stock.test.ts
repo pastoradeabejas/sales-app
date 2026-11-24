@@ -17,7 +17,6 @@ import {
   rateText,
   reasonLabel,
   reasonValue,
-  recentMovements,
   sharesToPercents,
   toInputText,
   transformSummary,
@@ -202,45 +201,6 @@ describe('labels and texts', () => {
   it('sell rate per week, one decimal at most', () => {
     expect(rateText(300, cheese)).toBe('≈ 2.1 kg / week');
     expect(rateText(10 / 7, yogurt)).toBe('≈ 10 pcs / week');
-  });
-});
-
-describe('recentMovements', () => {
-  const today = '2026-11-22';
-  const events = [
-    adjust('add', '2026-11-20', 'milk', 2000000, { unitCost: 45 }),
-    adjust('remove', '2026-11-21', 'yog', 16, { reason: 'waste' }),
-    transform('2026-11-22', [['milk', 500000]], [['yog', 10000]], { recipeId: 'r1' }, '09:10'),
-    adjust('add', '2026-11-19', 'milk', 1, { voided: true }),
-  ];
-  const orders = [order('2026-11-22', [['chz', 1250], ['yog', 24]], '12:00')];
-  const recipes = [{ id: 'r1', name: 'Yogurt from milk' }];
-  const items = recentMovements(orders, events, recipes, byId, today);
-
-  it('newest first, voided skipped, limited', () => {
-    expect(items.map((i) => i.kind)).toEqual(['sale', 'transform', 'remove', 'add']);
-    expect(recentMovements(orders, events, recipes, byId, today, 2)).toHaveLength(2);
-  });
-  it('titles, subtitles, deltas and links', () => {
-    expect(items[0]).toMatchObject({ title: 'Sale · Lucía', sub: 'Today', deltas: ['Parmigiano −1.25 kg', 'Yogurt −24 pcs'], href: `#/orders/${orders[0].id}` });
-    expect(items[1]).toMatchObject({ title: 'Transform · Yogurt from milk', deltas: ['Milk −500 kg', 'Yogurt +10,000 pcs'], href: '#/stock/milk' });
-    expect(items[2]).toMatchObject({ title: 'Remove · Waste', sub: 'Yesterday · Yogurt', deltas: ['−16 pcs'], href: '#/stock/yog' });
-    expect(items[3]).toMatchObject({ title: 'Add · Milk', sub: '20 Nov · €0.45 / kg', deltas: ['+2,000 kg'] });
-  });
-  it('shows purchases with their stock lines; expense-only purchases are skipped (§16.3)', () => {
-    const map = new Map(byId);
-    map.set('fuel', cls('fuel', 'Fuel', 0, 'pcs', { trackStock: false, sellable: false }));
-    const pl = (classId: string, amount: number, lineTotal: number) => ({ lineId: 'l', classId, className: classId, unitName: 'kg', decimals: 3 as const, amount, lineTotal });
-    const p = (id: string, lines: ReturnType<typeof pl>[], supplierName = 'Granja') => ({
-      id, ...stamp(today, '13:00'), date: today, supplierId: null, supplierName, lines, total: 0, method: 'cash' as const, note: '', voided: false,
-    });
-    const got = recentMovements([], [], [], map, today, 10, [p('p1', [pl('milk', 100000, 4500), pl('fuel', 1, 4000)]), p('p2', [pl('fuel', 1, 4000)])]);
-    expect(got).toEqual([{ key: 'p1', kind: 'purchase', title: 'Purchase · Granja', sub: 'Today', deltas: ['Milk +100 kg'], href: '#/purchases/p1' }]);
-  });
-  it('ignores sales of untracked classes', () => {
-    const map = new Map(byId);
-    map.set('x', cls('x', 'X', 0, 'pcs', { trackStock: false }));
-    expect(recentMovements([order(today, [['x', 1]])], [], [], map, today)).toEqual([]);
   });
 });
 

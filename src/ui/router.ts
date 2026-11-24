@@ -18,6 +18,7 @@ const routes = [
   ['stock-class', 'stock/:classId', 'stock'],
   ['products', 'products', 'stock'],
   ['product', 'products/:classId', 'stock'],
+  ['recipes', 'recipes', 'stock'],
   ['purchases', 'purchases', 'expenses'],
   ['purchase-new', 'purchases/new', 'expenses'],
   ['purchase', 'purchases/:id', 'expenses'],
@@ -67,7 +68,7 @@ export function parseQuery(hash: string): Record<string, string> {
 export const SIDES: Record<string, string[]> = {
   orders: ['orders', 'clients'],
   expenses: ['purchases', 'suppliers'],
-  stock: ['stock', 'products'],
+  stock: ['stock', 'recipes'],
 };
 
 export const SIDES_KEY = 'tabSides';

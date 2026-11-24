@@ -5,7 +5,7 @@
   import Tag from '../../components/Tag.svelte';
   import Sheet from '../../components/Sheet.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
-  import { app, view, localDate, saveClass, saveRecipe } from '../../data.svelte.ts';
+  import { app, view, localDate, saveClass } from '../../data.svelte.ts';
   import { go } from '../../router.svelte.ts';
   import { showToast } from '../../toast.svelte.ts';
   import { formatAmount } from '../../../core/quantity.ts';
@@ -13,9 +13,7 @@
   import { isLowStock } from '../../../core/stock.ts';
   import { rangeFor, unitsSold, type ClassSold } from '../../../core/stats.ts';
   import { fullName, normalizeGroup, renameGroup, type GroupNode } from '../../../core/groups.ts';
-  import type { ProductClass, Recipe } from '../../../core/types.ts';
-  import RecipeSheet from '../stock/RecipeSheet.svelte';
-  import { activeRecipes, recipeNameError, transformSummary } from '../stock/logic.ts';
+  import type { ProductClass } from '../../../core/types.ts';
   import CustomFilter from './CustomFilter.svelte';
   import { filterByCustomField } from './customFilter.ts';
   import { costLabel, priceLabel, sortClasses, sortedVariants } from './logic.ts';
@@ -50,25 +48,6 @@
     } catch {
       // Storage blocked: the view still switches for this visit.
     }
-  }
-
-  // Recipes (moved here from Stock): list, edit, use, restore archived.
-  const recipes = $derived(activeRecipes(app.recipes));
-  const archivedRecipes = $derived(app.recipes.filter((r) => r.archived).sort((a, b) => a.name.localeCompare(b.name)));
-  let showArchivedRecipes = $state(false);
-  let sheetOpen = $state(false);
-  let editing = $state<Recipe | null>(null);
-  function openSheet(r: Recipe | null) {
-    editing = r;
-    sheetOpen = true;
-  }
-  async function restore(r: Recipe) {
-    if (recipeNameError(r.name, app.recipes, r.id)) {
-      showToast(`Archive the other recipe called ${r.name} first`);
-      return;
-    }
-    await saveRecipe({ ...r, archived: false });
-    showToast(`Restored ${r.name}`);
   }
 
   // Collapsed groups, kept per device.
@@ -237,7 +216,7 @@
   </table>
 {/snippet}
 
-<Header title="Products">
+<Header title="Stock">
   {#snippet actions()}
     <button type="button" class="btn view-btn" aria-label={viewMode === 'table' ? 'Card view' : 'Table view'} onclick={switchView}>
       <Icon name={viewMode === 'table' ? 'cards' : 'table'} />
@@ -245,9 +224,15 @@
     <a class="btn btn-primary" href="#/products/new">+ New product</a>
   {/snippet}
 </Header>
-<TabSwitch side="products" />
+<TabSwitch side="stock" />
 
 <div class="page">
+  <section class="big-actions">
+    <a class="big b-add" href="#/stock/add"><Icon name="plus" size={24} />Add</a>
+    <a class="big b-tr" href="#/stock/transform"><Icon name="transform" size={24} />Transform</a>
+    <a class="big b-remove" href="#/stock/remove"><Icon name="minus" size={24} />Remove</a>
+  </section>
+
   {#if app.products.length === 0}
     <EmptyState title="Start by adding your first product">
       <a class="btn btn-primary" href="#/products/new">+ New product</a>
@@ -268,47 +253,8 @@
     </button>
   {/if}
 
-  <section class="card">
-    <div class="section-head">
-      <h2>Recipes</h2>
-      <button type="button" class="btn-ghost new" onclick={() => openSheet(null)}>+ New</button>
-    </div>
-    <div class="list">
-      {#each recipes as r (r.id)}
-        <div class="list-row">
-          <span class="grow">
-            <span class="title">{r.name}</span>
-            <span class="muted">{transformSummary(r.inputs, r.outputs, view.classesById)}</span>
-          </span>
-          <button type="button" class="edit" aria-label="View {r.name}" onclick={() => openSheet(r)}>View</button>
-          <a class="use" href="#/stock/transform?recipe={r.id}" aria-label="Use {r.name}">Use</a>
-        </div>
-      {:else}
-        <p class="muted">No recipes yet. Tick "Save as recipe" on a transform to keep one.</p>
-      {/each}
-    </div>
-    {#if archivedRecipes.length}
-      <button type="button" class="btn-ghost toggle" aria-expanded={showArchivedRecipes} onclick={() => (showArchivedRecipes = !showArchivedRecipes)}>
-        {showArchivedRecipes ? 'Hide' : 'Show'} archived recipes ({archivedRecipes.length})
-      </button>
-      {#if showArchivedRecipes}
-        <div class="list">
-          {#each archivedRecipes as r (r.id)}
-            <div class="list-row">
-              <span class="grow">
-                <span class="title">{r.name}</span>
-                <span class="muted">{transformSummary(r.inputs, r.outputs, view.classesById)}</span>
-              </span>
-              <button type="button" class="edit" aria-label="Restore {r.name}" onclick={() => restore(r)}>Restore</button>
-            </div>
-          {/each}
-        </div>
-      {/if}
-    {/if}
-  </section>
 </div>
 
-<RecipeSheet bind:open={sheetOpen} recipe={editing} />
 
 <Sheet bind:open={menuOpen} title={menuPath.split('/').join(' - ')}>
   {#if renaming}
@@ -502,43 +448,41 @@
     color: var(--muted);
     cursor: pointer;
   }
+  .big-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .big {
+    height: 84px;
+    border-radius: var(--radius-card);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    text-decoration: none;
+    font-weight: 600;
+    border: 1px solid transparent;
+  }
+  .b-add {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+  .b-tr {
+    background: var(--ink);
+    color: var(--bg);
+  }
+  .b-remove {
+    background: var(--surface);
+    border-color: var(--border);
+    color: var(--owed);
+  }
   .form {
     display: grid;
     gap: 12px;
   }
-  h2,
   p {
     margin: 0;
-  }
-  .new,
-  .toggle {
-    min-height: var(--tap);
-    font-weight: 600;
-  }
-  .new {
-    display: inline-flex;
-    align-items: center;
-  }
-  .toggle {
-    padding: 0;
-  }
-  .edit,
-  .use {
-    min-height: var(--tap);
-    padding: 0 14px;
-    border-radius: 10px;
-    font-weight: 600;
-  }
-  .edit {
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--ink);
-  }
-  .use {
-    background: var(--accent-soft);
-    color: var(--accent-strong);
-    display: inline-flex;
-    align-items: center;
-    text-decoration: none;
   }
 </style>

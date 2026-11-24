@@ -1,10 +1,10 @@
 // Pure helpers of the Stock screens (§8.9–8.12): previews, reasons, transform rows, shares, costs, texts, chart.
 import { buildTransformCosts, sharesValid } from '../../../core/costs.ts';
-import { formatUnitCost, parseMoney } from '../../../core/money.ts';
+import { parseMoney } from '../../../core/money.ts';
 import { fullName } from '../../../core/groups.ts';
 import { formatAmount } from '../../../core/quantity.ts';
 import { daysLeft, type Movement } from '../../../core/stock.ts';
-import type { ClassAmount, CostShare, Decimals, Id, LabourCost, Order, ProductClass, Purchase, Scaled, StockEvent, TransformCosts } from '../../../core/types.ts';
+import type { ClassAmount, CostShare, Decimals, Id, LabourCost, ProductClass, Scaled, TransformCosts } from '../../../core/types.ts';
 
 /** Stock before and after an add or remove; an add on negative stock starts from 0 (§4.3). */
 export function movePreview(stock: Scaled, type: 'add' | 'remove', amount: Scaled | null) {
@@ -167,71 +167,6 @@ export function rateText(perDay: number, cls: ProductClass): string {
   const d = Math.min(cls.unit.decimals, 1) as Decimals;
   const perWeek = Math.round((perDay * 7 * 10 ** d) / 10 ** cls.unit.decimals);
   return `≈ ${formatAmount(perWeek, d, cls.unit.name)} / week`;
-}
-
-export interface RecentItem {
-  key: string;
-  kind: 'add' | 'remove' | 'transform' | 'sale' | 'purchase';
-  title: string;
-  sub: string;
-  deltas: string[];
-  href: string;
-}
-
-/** The last movements across all tracked classes, newest first (§8.9). */
-export function recentMovements(
-  orders: Order[],
-  events: StockEvent[],
-  recipes: { id: Id; name: string }[],
-  classesById: Map<Id, ProductClass>,
-  today: string,
-  limit = 10,
-  purchases: Purchase[] = [],
-): RecentItem[] {
-  const tracked = (id: Id) => classesById.get(id)?.trackStock === true;
-  const named = (x: ClassAmount, sign: string) => `${nameOf(classesById, x.classId)} ${amountOf(classesById.get(x.classId), x.amount, sign)}`;
-  const all: (RecentItem & { date: string; createdAt: string })[] = [];
-  for (const o of orders) {
-    if (o.voided) continue;
-    const sums = new Map<Id, number>();
-    for (const l of o.lines) if (tracked(l.classId)) sums.set(l.classId, (sums.get(l.classId) ?? 0) + l.amount);
-    if (!sums.size) continue;
-    all.push({
-      key: o.id, kind: 'sale', date: o.date, createdAt: o.createdAt, title: `Sale · ${o.clientName}`,
-      sub: cap(dayLabel(o.date, today)), deltas: [...sums].map(([classId, amount]) => named({ classId, amount }, '−')), href: `#/orders/${o.id}`,
-    });
-  }
-  for (const e of events) {
-    if (e.voided) continue;
-    const day = cap(dayLabel(e.date, today));
-    if (e.type === 'transform') {
-      const recipe = recipes.find((r) => r.id === e.recipeId)?.name;
-      all.push({
-        key: e.id, kind: 'transform', date: e.date, createdAt: e.createdAt, title: recipe ? `Transform · ${recipe}` : 'Transform',
-        sub: day, deltas: [...e.inputs.map((x) => named(x, '−')), ...e.outputs.map((x) => named(x, '+'))], href: `#/stock/${e.inputs[0]?.classId ?? ''}`,
-      });
-      continue;
-    }
-    const c = classesById.get(e.classId);
-    if (!c?.trackStock) continue;
-    const add = e.type === 'add';
-    const cost = add && e.unitCost !== null ? ` · ${formatUnitCost(e.unitCost)} / ${c.unit.name}` : '';
-    all.push({
-      key: e.id, kind: e.type, date: e.date, createdAt: e.createdAt,
-      title: add ? `Add · ${fullName(c)}` : `Remove · ${reasonLabel(e.reason) || 'Other'}`,
-      sub: add ? `${day}${cost}` : `${day} · ${fullName(c)}`, deltas: [amountOf(c, e.amount, add ? '+' : '−')], href: `#/stock/${c.id}`,
-    });
-  }
-  for (const p of purchases) {
-    const lines = p.voided ? [] : p.lines.filter((l) => tracked(l.classId));
-    if (!lines.length) continue;
-    all.push({
-      key: p.id, kind: 'purchase', date: p.date, createdAt: p.createdAt, title: `Purchase · ${p.supplierName || 'No supplier'}`,
-      sub: cap(dayLabel(p.date, today)), deltas: lines.map((l) => named(l, '+')), href: `#/purchases/${p.id}`,
-    });
-  }
-  all.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
-  return all.slice(0, limit).map(({ date: _d, createdAt: _c, ...r }) => r);
 }
 
 export interface ChartModel {

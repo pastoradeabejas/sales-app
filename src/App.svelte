@@ -16,7 +16,7 @@
   import OrderDetail from './ui/screens/orders/OrderDetail.svelte';
   import Clients from './ui/screens/clients/Clients.svelte';
   import ClientDetail from './ui/screens/clients/ClientDetail.svelte';
-  import Stock from './ui/screens/stock/Stock.svelte';
+  import Recipes from './ui/screens/stock/Recipes.svelte';
   import StockMove from './ui/screens/stock/StockMove.svelte';
   import Transform from './ui/screens/stock/Transform.svelte';
   import StockClass from './ui/screens/stock/StockClass.svelte';
@@ -40,7 +40,8 @@
     'order-edit': OrderForm,
     clients: Clients,
     client: ClientDetail,
-    stock: Stock,
+    stock: Products,
+    recipes: Recipes,
     'stock-add': StockMove,
     'stock-remove': StockMove,
     'stock-transform': Transform,
