@@ -2,7 +2,7 @@
   import { fullName } from '../../../core/groups.ts';
   import { formatMoney } from '../../../core/money.ts';
   import { formatAmount } from '../../../core/quantity.ts';
-  import { collected, revenue, topClients, whoOwes } from '../../../core/stats.ts';
+  import { collected, profitSummary, revenue, topClients, whoOwes } from '../../../core/stats.ts';
   import { daysLeft, isLowStock, sellRate } from '../../../core/stock.ts';
   import Avatar from '../../components/Avatar.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
@@ -33,6 +33,7 @@
   const top = $derived(topClients(app.orders, range, 'revenue', 5));
   const sales = $derived(revenue(app.orders, range));
   const paidIn = $derived(collected(app.payments, range));
+  const spent = $derived(profitSummary(app.orders, app.purchases, app.stock, view.classesById, range).spent);
   const stock = $derived(
     products
       .filter((p) => p.trackStock)
@@ -136,6 +137,7 @@
   <section class="pair">
     <div class="card"><span class="muted">Sales {rangeNoun}</span><span class="big">{formatMoney(sales)}</span></div>
     <div class="card"><span class="muted">Collected {rangeNoun}</span><span class="big">{formatMoney(paidIn)}</span></div>
+    <div class="card"><span class="muted">Spent {rangeNoun}</span><span class="big">{formatMoney(spent)}</span></div>
   </section>
 
   <ProfitCard {range} />
@@ -161,6 +163,9 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
+  }
+  .pair .card:last-child {
+    grid-column: 1 / -1;
   }
   .pair .card {
     display: flex;
