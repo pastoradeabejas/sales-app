@@ -16,6 +16,14 @@ export function changeTone(pct: number | null): 'up' | 'down' | 'flat' {
   return pct > 0 ? 'up' : 'down';
 }
 
+/** Change of a margin in percentage points: 30 % -> 33 % is "▲ 3.0 pts". */
+export function pointsChange(cur: number | null, prev: number | null): { text: string; tone: 'up' | 'down' | 'flat' } {
+  if (cur === null || prev === null) return { text: '—', tone: 'flat' };
+  const pts = Math.round((cur - prev) * 1000) / 10;
+  if (pts === 0) return { text: '0 pts', tone: 'flat' };
+  return { text: `${pts > 0 ? '▲' : '▼'} ${Math.abs(pts).toFixed(1)} pts`, tone: pts > 0 ? 'up' : 'down' };
+}
+
 /** Margin fraction as "33.3 %"; "—" when unknown. */
 export function marginText(m: number | null): string {
   if (m === null) return '—';

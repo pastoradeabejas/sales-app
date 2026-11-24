@@ -8,7 +8,7 @@
   import Header from '../../components/Header.svelte';
   import Segmented from '../../components/Segmented.svelte';
   import { app, localDate, view } from '../../data.svelte.ts';
-  import { changeText, changeTone, marginText, monthLabel, profitRange, shareText, topRows, trendPoints } from './logic.ts';
+  import { changeText, changeTone, marginText, pointsChange, monthLabel, profitRange, shareText, topRows, trendPoints } from './logic.ts';
 
   let {}: { params?: Record<string, string>; query?: Record<string, string> } = $props();
 
@@ -27,11 +27,12 @@
   // Change of a value that can be null (no data): no change shown when either side is unknown.
   const delta = (cur: number | null, prev: number | null) => (cur === null || prev === null ? null : change(cur, prev));
 
-  const tiles = $derived([
+  type Tile = { label: string; value: string; pct: number | null; hint: string; pts?: { text: string; tone: 'up' | 'down' | 'flat' } };
+  const tiles: Tile[] = $derived([
     { label: 'Sales', value: formatMoney(sum.sales), pct: change(sum.sales, prevSum.sales), hint: '' },
     { label: 'Net profit', value: formatMoney(sum.net), pct: change(sum.net, prevSum.net), hint: '' },
-    { label: 'Gross margin', value: marginText(k.grossMargin), pct: delta(k.grossMargin, prevK.grossMargin), hint: '' },
-    { label: 'Net margin', value: marginText(k.netMargin), pct: delta(k.netMargin, prevK.netMargin), hint: '' },
+    { label: 'Gross margin', value: marginText(k.grossMargin), pct: null, pts: pointsChange(k.grossMargin, prevK.grossMargin), hint: '' },
+    { label: 'Net margin', value: marginText(k.netMargin), pct: null, pts: pointsChange(k.netMargin, prevK.netMargin), hint: '' },
     { label: 'Orders', value: String(k.orders), pct: change(k.orders, prevK.orders), hint: '' },
     { label: 'Average order', value: k.avgOrder === null ? '—' : formatMoney(Math.round(k.avgOrder)), pct: delta(k.avgOrder, prevK.avgOrder), hint: '' },
     { label: 'Break-even sales', value: k.breakEven === null ? '—' : formatMoney(k.breakEven), pct: delta(k.breakEven, prevK.breakEven), hint: 'sales needed to cover expenses at this margin' },
@@ -76,10 +77,11 @@
 
     <section class="tiles">
       {#each tiles as t (t.label)}
+        {@const c = t.pts ?? { text: changeText(t.pct), tone: changeTone(t.pct) }}
         <div class="card tile">
           <span class="muted">{t.label}</span>
           <span class="big">{t.value}</span>
-          <span class="change {changeTone(t.pct)}">{changeText(t.pct)}</span>
+          <span class="change {c.tone}">{c.text}</span>
           {#if t.hint}<span class="muted hint">{t.hint}</span>{/if}
         </div>
       {/each}

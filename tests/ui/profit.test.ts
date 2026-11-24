@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { changeText, changeTone, marginText, monthLabel, profitRange, shareText, topRows, trendPoints } from '../../src/ui/screens/profit/logic.ts';
+import { changeText, changeTone, marginText, monthLabel, pointsChange, profitRange, shareText, topRows, trendPoints } from '../../src/ui/screens/profit/logic.ts';
 
 describe('profit formatting', () => {
   it('formats the change vs the previous period', () => {
@@ -62,5 +62,14 @@ describe('trendPoints', () => {
     ]);
     expect(a).toEqual({ key: '2026-10', label: 'Oct', paid: 500, unpaid: 500, total: 1000 });
     expect(b).toEqual({ key: '2026-11', label: 'Nov', paid: 0, unpaid: 600, total: 600 });
+  });
+});
+
+describe('margin changes in percentage points', () => {
+  it('cur - prev in points, one decimal; null without both sides', () => {
+    expect(pointsChange(0.33, 0.3)).toEqual({ text: '▲ 3.0 pts', tone: 'up' });
+    expect(pointsChange(0.2, 0.25)).toEqual({ text: '▼ 5.0 pts', tone: 'down' });
+    expect(pointsChange(0.3, 0.3)).toEqual({ text: '0 pts', tone: 'flat' });
+    expect(pointsChange(null, 0.3)).toEqual({ text: '—', tone: 'flat' });
   });
 });
