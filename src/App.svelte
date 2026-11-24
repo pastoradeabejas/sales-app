@@ -22,6 +22,11 @@
   import StockClass from './ui/screens/stock/StockClass.svelte';
   import Products from './ui/screens/products/Products.svelte';
   import ClassDetail from './ui/screens/products/ClassDetail.svelte';
+  import Purchases from './ui/screens/expenses/Purchases.svelte';
+  import PurchaseForm from './ui/screens/expenses/PurchaseForm.svelte';
+  import PurchaseDetail from './ui/screens/expenses/PurchaseDetail.svelte';
+  import Suppliers from './ui/screens/expenses/Suppliers.svelte';
+  import SupplierDetail from './ui/screens/expenses/SupplierDetail.svelte';
 
   // Screens take any subset of { params, query }.
   type Screen = Component<any>;
@@ -42,6 +47,12 @@
     'stock-class': StockClass,
     products: Products,
     product: ClassDetail,
+    purchases: Purchases,
+    'purchase-new': PurchaseForm,
+    purchase: PurchaseDetail,
+    'purchase-edit': PurchaseForm,
+    suppliers: Suppliers,
+    supplier: SupplierDetail,
   };
 
   initData()
@@ -51,16 +62,26 @@
   // First run: Settings until the device is configured (§8.1).
   const name = $derived<RouteName>(app.ready && !isConfigured(app.settings) ? 'settings' : router.route.name);
   const Current = $derived(screens[name]);
-  const fab = $derived(name === 'overview' || name === 'orders');
+  const fab = $derived(name === 'overview' || name === 'orders' || name === 'purchases');
   // Forms have their own sticky footer: no bottom nav there.
   // Mac / wide screens: list and detail side by side on Orders and Clients (§8).
   const wideQuery = matchMedia('(min-width: 900px)');
   let wide = $state(wideQuery.matches);
   wideQuery.addEventListener('change', (e) => (wide = e.matches));
   const splitList = $derived(
-    !wide ? null : name === 'orders' || name === 'order' ? 'orders' : name === 'clients' || name === 'client' ? 'clients' : null,
+    !wide
+      ? null
+      : name === 'orders' || name === 'order'
+        ? 'orders'
+        : name === 'clients' || name === 'client'
+          ? 'clients'
+          : name === 'purchases' || name === 'purchase'
+            ? 'purchases'
+            : name === 'suppliers' || name === 'supplier'
+              ? 'suppliers'
+              : null,
   );
-  const form = $derived(['order-new', 'order-edit', 'stock-add', 'stock-remove', 'stock-transform'].includes(name));
+  const form = $derived(['order-new', 'order-edit', 'purchase-new', 'purchase-edit', 'stock-add', 'stock-remove', 'stock-transform'].includes(name));
 </script>
 
 {#if app.error}
@@ -81,7 +102,7 @@
     </div>
     <div class="pane detail-pane">
       {#if name === splitList}
-        <p class="muted pick">Select {splitList === 'orders' ? 'an order' : 'a client'} to see it here.</p>
+        <p class="muted pick">Select {{ orders: 'an order', clients: 'a client', purchases: 'a purchase', suppliers: 'a supplier' }[splitList]} to see it here.</p>
       {:else}
         {#key `${name}/${JSON.stringify(router.route.params)}`}
           <Current params={{ ...router.route.params, route: name }} query={router.query} />
@@ -97,7 +118,9 @@
   {/if}
 </main>
 
-{#if fab && app.ready}<Fab />{/if}
+{#if fab && app.ready}
+  {#if name === 'purchases'}<Fab href="#/purchases/new" label="New purchase" />{:else}<Fab />{/if}
+{/if}
 {#if !form}<BottomNav active={tabOf(name)} />{/if}
 <UpdateBanner />
 <Toaster />
