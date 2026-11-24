@@ -1,5 +1,6 @@
 // App data layer: all records in reactive state, derived lookups, and every
 // user action (validate in core, save through the store with its outbox).
+import { averageCostOnDay } from '../core/costs.ts';
 import { allocateAll, type ClientBalance } from '../core/payments.ts';
 import { newId } from '../core/ids.ts';
 import { orderTotal } from '../core/orders.ts';
@@ -87,6 +88,12 @@ export const view = {
     return snapshot;
   },
 };
+
+/** A class's average cost at the end of `date` (cost snapshot of a sale or transform that day); null when unknown. */
+export function avgCostOnDay(classId: Id, date: IsoDate): number | null {
+  const c = classesById.get(classId);
+  return c ? averageCostOnDay(c, date, app.orders, app.stock, classesById, app.purchases) : null;
+}
 
 let store: Store;
 

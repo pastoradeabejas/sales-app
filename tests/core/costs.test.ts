@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Decimals, ProductClass, StockAdjust, StockTransform, TransformCosts } from '../../src/core/types.ts';
 import {
   averageCostAt,
+  averageCostOnDay,
   buildTransformCosts,
   labourAmount,
   labourCosts,
@@ -137,6 +138,14 @@ describe('averageCostAt', () => {
     expect(averageCostAt(milk, [], events, all, { date: '2026-11-10', createdAt: '2026-11-10T10:00:00.000Z' })).toBe(50);
     expect(averageCostAt(milk, [], events, all, { date: '2026-10-01', createdAt: '2026-11-20T00:00:00.000Z' })).toBeNull();
     expect(averageCostAt(sugar, [], events, all)).toBeNull();
+  });
+
+  it('averageCostOnDay: the average at the end of that day; later days do not change it (trades keep it fixed)', () => {
+    const later = [...events, add('2026-11-20', 'milk', 20000, 100)];
+    expect(averageCostOnDay(milk, '2026-11-05', [], later, all)).toBe(40);
+    expect(averageCostOnDay(milk, '2026-11-10', [], later, all)).toBe(50);
+    expect(averageCostOnDay(milk, '2026-11-15', [], later, all)).toBe(50);
+    expect(averageCostOnDay(milk, '2026-10-31', [], later, all)).toBeNull();
   });
 
   it('feeds a transform end to end: materials snapshot → output average', () => {

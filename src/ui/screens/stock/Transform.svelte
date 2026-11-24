@@ -5,13 +5,13 @@
   import Header from '../../components/Header.svelte';
   import Icon from '../../components/Icon.svelte';
   import Segmented from '../../components/Segmented.svelte';
-  import { averageCostAt, labourAmount, labourCosts, materialsCost, otherDifference, outputUnitCosts } from '../../../core/costs.ts';
+  import { labourAmount, labourCosts, materialsCost, otherDifference, outputUnitCosts } from '../../../core/costs.ts';
   import { formatMoney, formatUnitCost } from '../../../core/money.ts';
   import { formatAmount, parseAmount } from '../../../core/quantity.ts';
   import { batch, parseBatches } from '../../../core/recipes.ts';
   import { stockWarnings, validateTransform } from '../../../core/stock.ts';
   import type { ClassAmount, Decimals } from '../../../core/types.ts';
-  import { app, freshRecord, localDate, saveStockEvent, view } from '../../data.svelte.ts';
+  import { app, avgCostOnDay, freshRecord, localDate, saveStockEvent, view } from '../../data.svelte.ts';
   import { liveName } from './grouping.ts';
   import { go } from '../../router.svelte.ts';
   import { showToast } from '../../toast.svelte.ts';
@@ -97,14 +97,8 @@
   const unitOf = (id: string) => view.classesById.get(id)?.unit.name ?? '';
   const nameOf = (id: string) => liveName(view.classesById, id, '');
 
-  // Materials at the transform date: current average for today or later, else the average up to that day.
-  const today = localDate();
-  function avgCostAt(classId: string) {
-    const c = view.classesById.get(classId);
-    if (!c) return null;
-    if (date >= today) return view.snapshot.get(classId)?.avgCost ?? null;
-    return averageCostAt(c, app.orders, app.stock, view.classesById, { date, createdAt: '~' }, app.purchases);
-  }
+  // Materials at the average cost of the transform's day (D-034).
+  const avgCostAt = (classId: string) => avgCostOnDay(classId, date);
   const mat = $derived(materialsCost(ins.filter((x) => x.amount > 0), avgCostAt, view.classesById));
   const lab = $derived(labourRows(labourTexts));
   const labour = $derived(labourCosts(lab.rows, view.levelsById));

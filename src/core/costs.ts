@@ -102,3 +102,15 @@ export function averageCostAt(
   );
   return t[t.length - 1]?.avgCostAfter ?? null;
 }
+
+/** Class average cost at the end of `date`: the cost a sale or transform of that day snapshots and keeps. */
+export function averageCostOnDay(
+  cls: ProductClass,
+  date: string,
+  orders: Order[],
+  events: StockEvent[],
+  classesById: Map<string, ProductClass>,
+  purchases: Purchase[] = [],
+): UnitCost | null {
+  return averageCostAt(cls, orders, events, classesById, { date, createdAt: '~' }, purchases);
+}

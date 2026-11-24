@@ -14,7 +14,7 @@
   import { formatAmount } from '../../../core/quantity.ts';
   import { stockWarnings } from '../../../core/stock.ts';
   import type { Id, Order, PaymentMethod } from '../../../core/types.ts';
-  import { app, freshRecord, localDate, newId, saveOrder, undoToast, view } from '../../data.svelte.ts';
+  import { app, avgCostOnDay, freshRecord, localDate, newId, saveOrder, undoToast, view } from '../../data.svelte.ts';
   import { go } from '../../router.svelte.ts';
   import { showToast } from '../../toast.svelte.ts';
   import GroupHeader from '../stock/GroupHeader.svelte';
@@ -92,7 +92,8 @@
     collapsed = toggleCollapsed(collapsed, path);
     saveCollapsed(localStorage, 'orderCollapsed', collapsed);
   }
-  const avgCost = (classId: Id) => view.snapshot.get(classId)?.avgCost ?? null;
+  // New lines snapshot the average cost of the order's day (D-034); lines kept from an edited order keep theirs.
+  const avgCost = (classId: Id) => avgCostOnDay(classId, date);
   const lines = $derived(draftLines(draft, index, avgCost, () => '', prev));
   const total = $derived(orderTotal(lines));
   const balance = $derived(view.balances.get(clientId));
