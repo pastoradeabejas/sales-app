@@ -1,8 +1,8 @@
 // Stock timeline, balance, average cost and sell rate (spec §3.6, §3.6b, §4.3).
-import type { Cents, Decimals, Order, ProductClass, Scaled, StockEvent, StockTransform, UnitCost } from './types.ts';
+import type { Cents, Decimals, Order, ProductClass, Purchase, Scaled, StockEvent, StockTransform, UnitCost } from './types.ts';
 
 /** transform-in = stock enters this class (it is an output); transform-out = it is consumed (an input), as labelled in §8.12. */
-export type MovementKind = 'add' | 'remove' | 'sale' | 'transform-in' | 'transform-out';
+export type MovementKind = 'add' | 'remove' | 'sale' | 'purchase' | 'transform-in' | 'transform-out';
 
 export interface Movement {
   date: string;
@@ -17,10 +17,11 @@ export interface Movement {
   /** A negative balance was reset to 0 before this movement. */
   reset: boolean;
   avgCostAfter: UnitCost | null;
-  ref: { type: 'order' | 'stock'; id: string };
+  ref: { type: 'order' | 'stock' | 'purchase'; id: string };
   reason?: string;
   otherClassIds?: string[];
   clientName?: string;
+  supplierName?: string;
 }
 
 export interface StockState {
@@ -43,14 +44,14 @@ export function perBaseUnit(cents: Cents, amount: Scaled, decimals: Decimals): U
 const sum = (xs: { amount: number }[]) => xs.reduce((s, x) => s + x.amount, 0);
 
 // Pushes one entry per class touched by the order or event, for classes that `want` returns.
-function collect(orders: Order[], events: StockEvent[], want: (id: string) => ProductClass | undefined): Map<string, Entry[]> {
+function collect(orders: Order[], events: StockEvent[], purchases: Purchase[], want: (id: string) => ProductClass | undefined): Map<string, Entry[]> {
   const out = new Map<string, Entry[]>();
   const push = (classId: string, e: Entry) => {
     if (!want(classId)) return;
     if (!out.has(classId)) out.set(classId, []);
     out.get(classId)!.push(e);
   };
-  const base = (r: { id: string; date: string; createdAt: string }, type: 'order' | 'stock') =>
+  const base = (r: { id: string; date: string; createdAt: string }, type: 'order' | 'stock' | 'purchase') =>
     ({ id: r.id, date: r.date, createdAt: r.createdAt, ref: { type, id: r.id } });
 
   for (const o of orders) {
@@ -58,6 +59,17 @@ function collect(orders: Order[], events: StockEvent[], want: (id: string) => Pr
     for (const classId of new Set(o.lines.map((l) => l.classId))) {
       const amount = sum(o.lines.filter((l) => l.classId === classId));
       push(classId, { ...base(o, 'order'), kind: 'sale', amount, cost: null, clientName: o.clientName });
+    }
+  }
+  for (const p of purchases) {
+    if (p.voided) continue;
+    for (const classId of new Set(p.lines.map((l) => l.classId))) {
+      const cls = want(classId);
+      if (!cls) continue;
+      const lines = p.lines.filter((l) => l.classId === classId);
+      const amount = sum(lines);
+      const cost = perBaseUnit(lines.reduce((s, l) => s + l.lineTotal, 0), amount, cls.unit.decimals);
+      push(classId, { ...base(p, 'purchase'), kind: 'purchase', amount, cost, supplierName: p.supplierName });
     }
   }
   for (const ev of events) {
@@ -94,7 +106,7 @@ function run(entries: Entry[]): Movement[] {
   let avg: UnitCost | null = null;
   return sorted.map(({ id: _id, cost, ...e }) => {
     const before = balance;
-    const incoming = e.kind === 'add' || e.kind === 'transform-in';
+    const incoming = e.kind === 'add' || e.kind === 'purchase' || e.kind === 'transform-in';
     const reset = incoming && balance < 0;
     if (reset) balance = 0;
     if (incoming && cost !== null) avg = round4(avg === null ? cost : (balance * avg + e.amount * cost) / (balance + e.amount));
@@ -105,15 +117,21 @@ function run(entries: Entry[]): Movement[] {
 }
 
 /** One class's stock timeline, oldest first (§4.3); [] when the class does not track stock. */
-export function classTimeline(cls: ProductClass, orders: Order[], events: StockEvent[], _classesById: Map<string, ProductClass>): Movement[] {
+export function classTimeline(
+  cls: ProductClass,
+  orders: Order[],
+  events: StockEvent[],
+  _classesById: Map<string, ProductClass>,
+  purchases: Purchase[] = [],
+): Movement[] {
   if (!cls.trackStock) return [];
-  return run(collect(orders, events, (id) => (id === cls.id ? cls : undefined)).get(cls.id) ?? []);
+  return run(collect(orders, events, purchases, (id) => (id === cls.id ? cls : undefined)).get(cls.id) ?? []);
 }
 
 /** Current stock, average cost and last movement of every tracked class, in one pass over the records. */
-export function stockSnapshot(classes: ProductClass[], orders: Order[], events: StockEvent[]): Map<string, StockState> {
+export function stockSnapshot(classes: ProductClass[], orders: Order[], events: StockEvent[], purchases: Purchase[] = []): Map<string, StockState> {
   const tracked = new Map(classes.filter((c) => c.trackStock).map((c) => [c.id, c]));
-  const entries = collect(orders, events, (id) => tracked.get(id));
+  const entries = collect(orders, events, purchases, (id) => tracked.get(id));
   const snap = new Map<string, StockState>();
   for (const id of tracked.keys()) {
     const t = run(entries.get(id) ?? []);

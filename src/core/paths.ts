@@ -4,8 +4,9 @@ import type { RecordType } from './types.ts';
 const DIR: Record<RecordType, string> = {
   product: 'products', client: 'clients', order: 'orders',
   payment: 'payments', stock: 'stock', recipe: 'recipes',
+  supplier: 'suppliers', purchase: 'purchases', level: 'levels',
 };
-const DATED: ReadonlySet<RecordType> = new Set(['order', 'payment', 'stock']);
+const DATED: ReadonlySet<RecordType> = new Set(['order', 'payment', 'stock', 'purchase']);
 
 /** Path of a new record. Callers store it and reuse it for edits: a path never changes. */
 export function recordPath(type: RecordType, record: { id: string; date?: string }): string {

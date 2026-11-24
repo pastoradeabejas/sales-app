@@ -3,6 +3,7 @@
 import { allocateAll, type ClientBalance } from '../core/payments.ts';
 import { newId } from '../core/ids.ts';
 import { orderTotal } from '../core/orders.ts';
+import { purchaseTotal } from '../core/purchases.ts';
 import { recordPath } from '../core/paths.ts';
 import { stockSnapshot, type StockState } from '../core/stock.ts';
 import type {
@@ -13,9 +14,12 @@ import type {
   Payment,
   PaymentMethod,
   ProductClass,
+  Purchase,
   Recipe,
   RecordType,
   StockEvent,
+  Supplier,
+  WorkLevel,
 } from '../core/types.ts';
 import { loadDemo } from '../store/demo.ts';
 import { idbBackend } from '../store/idb.ts';
@@ -41,14 +45,20 @@ export const app = $state({
   payments: [] as Payment[],
   stock: [] as StockEvent[],
   recipes: [] as Recipe[],
+  suppliers: [] as Supplier[],
+  purchases: [] as Purchase[],
+  levels: [] as WorkLevel[],
   outboxCount: 0,
 });
 
 const classesById = $derived(new Map(app.products.map((c) => [c.id, c])));
 const clientsById = $derived(new Map(app.clients.map((c) => [c.id, c])));
 const ordersById = $derived(new Map(app.orders.map((o) => [o.id, o])));
+const suppliersById = $derived(new Map(app.suppliers.map((s) => [s.id, s])));
+const levelsById = $derived(new Map(app.levels.map((l) => [l.id, l])));
+const purchasesById = $derived(new Map(app.purchases.map((p) => [p.id, p])));
 const balances = $derived(allocateAll(app.orders, app.payments));
-const snapshot = $derived(stockSnapshot(app.products, app.orders, app.stock));
+const snapshot = $derived(stockSnapshot(app.products, app.orders, app.stock, app.purchases));
 
 /** Derived views, recomputed only when their records change. */
 export const view = {
@@ -60,6 +70,15 @@ export const view = {
   },
   get ordersById(): Map<Id, Order> {
     return ordersById;
+  },
+  get suppliersById(): Map<Id, Supplier> {
+    return suppliersById;
+  },
+  get levelsById(): Map<Id, WorkLevel> {
+    return levelsById;
+  },
+  get purchasesById(): Map<Id, Purchase> {
+    return purchasesById;
   },
   get balances(): Map<Id, ClientBalance> {
     return balances;
@@ -81,7 +100,7 @@ async function reload(stores: StoreName[]) {
   stores.forEach((s, i) => ((app as Record<StoreName, unknown>)[s] = loaded[i]));
 }
 
-const RECORD_STORES: StoreName[] = ['products', 'clients', 'orders', 'payments', 'stock', 'recipes'];
+const RECORD_STORES: StoreName[] = ['products', 'clients', 'orders', 'payments', 'stock', 'recipes', 'suppliers', 'purchases', 'levels'];
 
 /** Opens IndexedDB (memory if unavailable) and loads every record. */
 export async function initData() {
@@ -169,7 +188,8 @@ export function decimalsLocked(classId: Id): boolean {
     app.orders.some((o) => o.lines.some((l) => l.classId === classId)) ||
     app.stock.some((e) =>
       e.type === 'transform' ? [...e.inputs, ...e.outputs].some((s) => s.classId === classId) : e.classId === classId,
-    )
+    ) ||
+    app.purchases.some((p) => p.lines.some((l) => l.classId === classId))
   );
 }
 
@@ -253,6 +273,48 @@ export async function voidStockEvent(id: Id) {
 }
 
 export const saveRecipe = (r: Recipe) => save('recipe', $state.snapshot(r) as Recipe);
+
+// Suppliers, purchases and work levels (S14)
+export function newSupplierDraft(name = ''): Supplier {
+  return { ...fresh(), name, phone: '', notes: '', archived: false };
+}
+
+export const saveSupplier = (s: Supplier) => save('supplier', { ...$state.snapshot(s), name: s.name.trim() } as Supplier);
+
+export function newPurchaseDraft(date: IsoDate): Purchase {
+  return {
+    ...fresh(), date, supplierId: null, supplierName: '', lines: [], total: 0,
+    method: app.settings.lastPaymentMethod ?? 'cash', note: '', voided: false,
+  };
+}
+
+/** Saves a purchase: recomputes the total and snapshots the supplier name. */
+export async function savePurchase(p: Purchase): Promise<Purchase> {
+  const rec: Purchase = {
+    ...($state.snapshot(p) as Purchase),
+    supplierName: p.supplierId ? (suppliersById.get(p.supplierId)?.name ?? p.supplierName) : '',
+    total: purchaseTotal(p.lines),
+  };
+  const saved = await save('purchase', rec);
+  updateSettings({ lastPaymentMethod: rec.method });
+  return saved;
+}
+
+export async function voidPurchase(id: Id) {
+  const p = purchasesById.get(id);
+  if (p) await save('purchase', { ...$state.snapshot(p), voided: true });
+}
+
+/** Undo of a just-created purchase. */
+export function undoPurchaseToast(message: string, purchaseId: Id) {
+  showToast(message, { label: 'Undo', run: () => voidPurchase(purchaseId) });
+}
+
+export function newLevelDraft(): WorkLevel {
+  return { ...fresh(), name: '', hourlyRate: 0, archived: false };
+}
+
+export const saveLevel = (l: WorkLevel) => save('level', { ...$state.snapshot(l), name: l.name.trim() } as WorkLevel);
 
 /** Moves one client's orders and payments to another and archives it (§9). */
 export async function mergeClients(keepId: Id, dupId: Id) {

@@ -4,7 +4,7 @@ import { formatUnitCost, parseMoney } from '../../../core/money.ts';
 import { fullName } from '../../../core/groups.ts';
 import { formatAmount } from '../../../core/quantity.ts';
 import { daysLeft, type Movement } from '../../../core/stock.ts';
-import type { ClassAmount, CostShare, Decimals, Id, Order, ProductClass, Scaled, StockEvent, TransformCosts } from '../../../core/types.ts';
+import type { ClassAmount, CostShare, Decimals, Id, LabourCost, Order, ProductClass, Purchase, Scaled, StockEvent, TransformCosts } from '../../../core/types.ts';
 
 /** Stock before and after an add or remove; an add on negative stock starts from 0 (§4.3). */
 export function movePreview(stock: Scaled, type: 'add' | 'remove', amount: Scaled | null) {
@@ -88,8 +88,9 @@ export function costsFromForm(
   form: CostForm,
   mat: { materials: number; complete: boolean },
   outputs: ClassAmount[],
+  labour: LabourCost[] = [],
 ): { costs: TransformCosts | null; error: string } {
-  if (!form.opened) return { costs: null, error: '' };
+  if (!form.opened && !labour.length) return { costs: null, error: '' };
   const extras = [];
   if (form.mode === 'breakdown') {
     for (const x of form.extras) {
@@ -98,7 +99,7 @@ export function costsFromForm(
       if (amount === null) return { costs: null, error: 'Check the extra cost amounts.' };
       extras.push({ label: x.label.trim() || 'Other', amount });
     }
-    if (!extras.length && mat.materials === 0 && !mat.complete) return { costs: null, error: '' };
+    if (!extras.length && !labour.length && mat.materials === 0 && !mat.complete) return { costs: null, error: '' };
   }
   let enteredTotal: number | undefined;
   if (form.mode === 'total') {
@@ -113,7 +114,7 @@ export function costsFromForm(
     if (!s || !sharesValid(s)) return { costs: null, error: 'Shares must add up to 100%.' };
     shares = s;
   }
-  const costs = buildTransformCosts({ mode: form.mode, materials: mat.materials, materialsComplete: mat.complete, extras, enteredTotal, outputs, shares });
+  const costs = buildTransformCosts({ mode: form.mode, materials: mat.materials, materialsComplete: mat.complete, ...(labour.length ? { labour } : {}), extras, enteredTotal, outputs, shares });
   return { costs, error: '' };
 }
 
@@ -144,6 +145,8 @@ export function movementLabel(m: Movement, classesById: Map<Id, ProductClass>): 
       return `Transform out (to ${others})`;
     case 'sale':
       return `Sale (${m.clientName ?? ''})`;
+    case 'purchase':
+      return m.supplierName ? `Purchase (from ${m.supplierName})` : 'Purchase';
   }
 }
 
@@ -168,7 +171,7 @@ export function rateText(perDay: number, cls: ProductClass): string {
 
 export interface RecentItem {
   key: string;
-  kind: 'add' | 'remove' | 'transform' | 'sale';
+  kind: 'add' | 'remove' | 'transform' | 'sale' | 'purchase';
   title: string;
   sub: string;
   deltas: string[];
@@ -183,6 +186,7 @@ export function recentMovements(
   classesById: Map<Id, ProductClass>,
   today: string,
   limit = 10,
+  purchases: Purchase[] = [],
 ): RecentItem[] {
   const tracked = (id: Id) => classesById.get(id)?.trackStock === true;
   const named = (x: ClassAmount, sign: string) => `${nameOf(classesById, x.classId)} ${amountOf(classesById.get(x.classId), x.amount, sign)}`;
@@ -218,6 +222,14 @@ export function recentMovements(
       sub: add ? `${day}${cost}` : `${day} · ${fullName(c)}`, deltas: [amountOf(c, e.amount, add ? '+' : '−')], href: `#/stock/${c.id}`,
     });
   }
+  for (const p of purchases) {
+    const lines = p.voided ? [] : p.lines.filter((l) => tracked(l.classId));
+    if (!lines.length) continue;
+    all.push({
+      key: p.id, kind: 'purchase', date: p.date, createdAt: p.createdAt, title: `Purchase · ${p.supplierName || 'No supplier'}`,
+      sub: cap(dayLabel(p.date, today)), deltas: lines.map((l) => named(l, '+')), href: `#/purchases/${p.id}`,
+    });
+  }
   all.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
   return all.slice(0, limit).map(({ date: _d, createdAt: _c, ...r }) => r);
 }
@@ -243,7 +255,7 @@ export function chartModel(timeline: Movement[], today: string, w = 340, h = 120
   for (const m of timeline) {
     if (days[days.length - 1]?.date === m.date) days[days.length - 1].balance = m.balanceAfter;
     else days.push({ date: m.date, balance: m.balanceAfter });
-    const k = m.kind === 'add' ? 'add' : m.kind.startsWith('transform') ? 'transform' : null;
+    const k = m.kind === 'add' || m.kind === 'purchase' ? 'add' : m.kind.startsWith('transform') ? 'transform' : null;
     if (k) kinds.set(m.date, (kinds.get(m.date) ?? new Set()).add(k));
   }
   const first = days[0].date;

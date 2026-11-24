@@ -146,10 +146,25 @@ export interface CostShare {
   share: number;
 }
 
+/** Minutes of one work level (§16.5). */
+export interface LabourRow {
+  levelId: Id;
+  minutes: number;
+}
+
+/** Labour snapshot on a transform: amount = roundHalfUp(minutes × hourlyRate / 60). */
+export interface LabourCost extends LabourRow {
+  levelName: string;
+  hourlyRate: Cents;
+  amount: Cents;
+}
+
 export interface TransformCosts {
   mode: 'breakdown' | 'total';
   materials: Cents;
   materialsComplete: boolean;
+  /** Absent on transforms saved before v1.4 (= none). */
+  labour?: LabourCost[];
   extras: CostExtra[];
   total: Cents;
   allocation: CostShare[];
@@ -175,9 +190,52 @@ export interface Recipe extends RecordBase {
   /** Optional defaults for the transform costs (§3.6a). */
   extras: CostExtra[];
   shares: CostShare[];
+  /** Labour of one batch (§16.5); absent on recipes saved before v1.4. */
+  labour?: LabourRow[];
   archived: boolean;
 }
 
-export type RecordType = 'product' | 'client' | 'order' | 'payment' | 'stock' | 'recipe';
+export interface Supplier extends RecordBase {
+  name: string;
+  phone: string;
+  notes: string;
+  archived: boolean;
+}
 
-export const SCHEMA_VERSION = 1;
+export interface PurchaseLine {
+  lineId: Id;
+  classId: Id;
+  className: string;
+  unitName: string;
+  decimals: Decimals;
+  /** Scaled base units bought (expense items: 1 unit). */
+  amount: Scaled;
+  /** Cents paid for the line. */
+  lineTotal: Cents;
+}
+
+/** Always paid at once (§16.3). */
+export interface Purchase extends RecordBase {
+  date: IsoDate;
+  supplierId: Id | null;
+  supplierName: string;
+  lines: PurchaseLine[];
+  total: Cents;
+  method: PaymentMethod;
+  note: string;
+  voided: boolean;
+}
+
+/** Work qualification with its hourly rate (§16.5). */
+export interface WorkLevel extends RecordBase {
+  name: string;
+  hourlyRate: Cents;
+  archived: boolean;
+}
+
+export type RecordType = 'product' | 'client' | 'order' | 'payment' | 'stock' | 'recipe' | 'supplier' | 'purchase' | 'level';
+
+/** Data repo schema (meta.json, backups); 2 = v1.4 records (§16.8). */
+export const SCHEMA_VERSION = 2;
+/** `schema` of each record file; record formats only gained optional fields. */
+export const RECORD_SCHEMA = 1;

@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { demoRecords, loadDemo } from '../../src/store/demo.ts';
 import { memoryBackend } from '../../src/store/memory.ts';
 import { createStore } from '../../src/store/store.ts';
+import { stockSnapshot } from '../../src/core/stock.ts';
+import { isExpenseItem } from '../../src/core/purchases.ts';
 import { fullName } from '../../src/core/groups.ts';
-import type { Client, Order, Payment, ProductClass, Recipe, StockEvent } from '../../src/core/types.ts';
+import type { Client, Order, Payment, ProductClass, Purchase, Recipe, StockEvent, Supplier, WorkLevel } from '../../src/core/types.ts';
 
 const today = '2026-11-23';
 const now = '2026-11-23T09:00:00.000Z';
@@ -15,6 +17,9 @@ const orders = of<Order>('order');
 const payments = of<Payment>('payment');
 const stock = of<StockEvent>('stock');
 const recipes = of<Recipe>('recipe');
+const purchases = of<Purchase>('purchase');
+const suppliers = of<Supplier>('supplier');
+const levels = of<WorkLevel>('level');
 const variants = new Map(products.flatMap((p) => p.variants.map((v) => [v.id, { p, v }] as const)));
 const daysAgo = (d: string) => (Date.parse(today) - Date.parse(d)) / 86400000;
 
@@ -35,7 +40,7 @@ describe('demoRecords', () => {
       'Gifts - Christmas box', 'Honeycomb - Honeycomb', 'Pollen - 250g Jar',
       'Dairy - Milk - Raw milk', 'Dairy - Milk - 1L Bottle', 'Dairy - Cheese - Cured cheese', 'Dairy - Cheese - Fresh cheese',
       'Dairy - Yogurt - Natural yogurt', 'Meat - Pork - Chorizo', 'Meat - Pork - Pork loin', 'Meat - Beef - Minced beef',
-      'Meat - Beef - Steak',
+      'Meat - Beef - Steak', 'Expenses - Fuel', 'Expenses - Market fee', 'Expenses - Hive treatment',
     ]);
     expect(products.find((p) => p.name === 'Natural yogurt')!.variants.map((v) => `${v.label}/${v.baseAmount}`)).toEqual(['Single/1', 'Pack of 4/4']);
     expect(products.find((p) => p.name === 'Cured cheese')!.variants.map((v) => `${v.label}/${v.kind}`)).toEqual(['By weight/variable', 'Quarter 750 g/fixed']);
@@ -65,6 +70,7 @@ describe('demoRecords', () => {
         e.outputs.forEach((x) => moves.push([e.date, 0, x.classId, x.amount]));
       } else moves.push([e.date, 0, e.classId, e.type === 'add' ? e.amount : -e.amount]);
     }
+    for (const p of purchases) p.lines.forEach((l) => moves.push([p.date, 0, l.classId, l.amount]));
     for (const o of orders.filter((x) => !x.voided)) o.lines.forEach((l) => moves.push([o.date, 1, l.classId, -l.amount]));
     moves.sort((a, b) => a[0].localeCompare(b[0]) || a[1] - b[1]);
     const balance = new Map<string, number>();
@@ -139,7 +145,7 @@ describe('demoRecords', () => {
       const c = tr.costs!;
       expect(c.mode).toBe('breakdown');
       expect(c.extras.length).toBeGreaterThan(0);
-      expect(c.total).toBe(c.materials + c.extras.reduce((s, e) => s + e.amount, 0));
+      expect(c.total).toBe(c.materials + (c.labour ?? []).reduce((s, l) => s + l.amount, 0) + c.extras.reduce((s, e) => s + e.amount, 0));
     }
     const boxId = products.find((p) => p.name === 'Christmas box')!.id;
     const box = transforms.filter((t) => t.outputs[0].classId === boxId);
@@ -147,7 +153,45 @@ describe('demoRecords', () => {
     expect(box[0].outputs).toEqual([{ classId: boxId, amount: 10 }]);
     expect(box[0].costs!.extras).toEqual([{ label: 'Time', amount: 1000 }]);
     const fill = transforms[0];
-    expect(fill.costs!.extras.map((e) => e.label)).toEqual(['Labels', 'Time']);
+    expect(fill.costs!.extras.map((e) => e.label)).toEqual(['Labels']);
+  });
+});
+
+describe('suppliers, work levels and purchases (§16.8)', () => {
+  it('has 3 suppliers, 3 work levels and labour on the fill recipes and transforms', () => {
+    expect(suppliers.map((s) => s.name)).toEqual(['Envases Levante', 'Apícola Sur', 'Gasolinera']);
+    expect(levels.map((l) => `${l.name}/${l.hourlyRate}`)).toEqual(['Level 1/1200', 'Level 2/1450', 'Level 3/1800']);
+    const fills = recipes.filter((r) => r.name.startsWith('Fill'));
+    expect(fills.map((r) => r.labour![0].minutes)).toEqual([2, 3, 2, 3, 2, 3]);
+    const fillTransform = stock.find((e) => e.type === 'transform' && e.recipeId === fills[0].id);
+    expect(fillTransform!.type === 'transform' && fillTransform!.costs!.labour).toEqual([
+      { levelId: 'demo-level-1', levelName: 'Level 1', minutes: 80, hourlyRate: 1200, amount: 1600 },
+    ]);
+  });
+
+  it('has purchases whose expense lines are expense items and whose totals add up', () => {
+    const byId = new Map(products.map((p) => [p.id, p]));
+    expect(purchases.length).toBeGreaterThan(20);
+    const expenseNames = new Set<string>();
+    for (const p of purchases) {
+      expect(p.total).toBe(p.lines.reduce((s, l) => s + l.lineTotal, 0));
+      expect(p.supplierId === null ? p.supplierName : suppliers.find((s) => s.id === p.supplierId)!.name).toBe(p.supplierName);
+      for (const l of p.lines) {
+        const c = byId.get(l.classId)!;
+        if (c.group === 'Expenses') {
+          expect(isExpenseItem(c)).toBe(true);
+          expenseNames.add(c.name);
+        } else expect(c.trackStock).toBe(true);
+      }
+    }
+    expect([...expenseNames].sort()).toEqual(['Fuel', 'Hive treatment', 'Market fee']);
+    expect(purchases.some((p) => p.supplierId === null)).toBe(true);
+  });
+
+  it('keeps the stock and average cost of the lid as before the purchases', () => {
+    const lid = products.find((p) => p.name === 'Lid')!;
+    expect(stockSnapshot(products, orders, stock, purchases).get(lid.id)).toMatchObject({ stock: 129, avgCost: 12 });
+    expect(stock.some((e) => e.type === 'add' && e.classId === lid.id)).toBe(false);
   });
 });
 

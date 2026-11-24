@@ -19,7 +19,7 @@
 
   const today = localDate();
   const cls = $derived(view.classesById.get(params.classId ?? ''));
-  const timeline = $derived(cls ? classTimeline(cls, app.orders, app.stock, view.classesById) : []);
+  const timeline = $derived(cls ? classTimeline(cls, app.orders, app.stock, view.classesById, app.purchases) : []);
   const stock = $derived(cls ? (view.snapshot.get(cls.id)?.stock ?? 0) : 0);
   const rate = $derived(cls ? sellRate(cls.id, app.orders, today) : { perDay: 0, enoughData: false });
   const fmt = (v: number) => (cls ? formatAmount(v, cls.unit.decimals, cls.unit.name) : '');
@@ -140,6 +140,8 @@
         {/snippet}
         {#if m.ref.type === 'order'}
           <a class="hist-row" href="#/orders/{m.ref.id}">{@render body()}</a>
+        {:else if m.ref.type === 'purchase'}
+          <a class="hist-row" href="#/purchases/{m.ref.id}">{@render body()}</a>
         {:else}
           <button type="button" class="hist-row" onclick={() => openEvent(m.ref.id)}>{@render body()}</button>
         {/if}
@@ -160,7 +162,7 @@
         {#if recipeId}<dt>Recipe</dt><dd>{app.recipes.find((r) => r.id === recipeId)?.name ?? 'Unknown'}</dd>{/if}
         {#if event.costs}
           <dt>Cost</dt>
-          <dd>{formatMoney(event.costs.total)} (materials {formatMoney(event.costs.materials)}{event.costs.materialsComplete ? '' : ', incomplete'})</dd>
+          <dd>{formatMoney(event.costs.total)} (materials {formatMoney(event.costs.materials)}{event.costs.materialsComplete ? '' : ', incomplete'}{event.costs.labour?.length ? `, labour ${formatMoney(event.costs.labour.reduce((t, l) => t + l.amount, 0))}` : ''})</dd>
         {/if}
       {:else}
         {@const c = view.classesById.get(event.classId)}

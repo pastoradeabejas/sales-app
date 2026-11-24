@@ -1,5 +1,5 @@
 // Stable, diff-friendly JSON for record files (spec §3.8).
-import type { RecordType } from './types.ts';
+import { SCHEMA_VERSION, type RecordType } from './types.ts';
 
 const STAMPS = ['createdAt', 'updatedAt', 'updatedBy'];
 const BASE = ['id', 'schema'];
@@ -13,7 +13,10 @@ const TOP: Record<RecordType, string[]> = {
   payment: withStamps('date', 'clientId', 'orderId', 'amount', 'method', 'note', 'voided'),
   // add/remove and transform events share one list; absent keys are skipped.
   stock: withStamps('date', 'type', 'classId', 'amount', 'unitCost', 'reason', 'inputs', 'outputs', 'recipeId', 'costs', 'note', 'voided'),
-  recipe: withStamps('name', 'inputs', 'outputs', 'extras', 'shares', 'archived'),
+  recipe: withStamps('name', 'inputs', 'outputs', 'extras', 'shares', 'labour', 'archived'),
+  supplier: withStamps('name', 'phone', 'notes', 'archived'),
+  purchase: withStamps('date', 'supplierId', 'supplierName', 'lines', 'total', 'method', 'note', 'voided'),
+  level: withStamps('name', 'hourlyRate', 'archived'),
 };
 
 // Key order of nested objects, chosen by the key that holds them.
@@ -24,7 +27,8 @@ const NESTED: Record<string, string[]> = {
   lines: ['lineId', 'classId', 'variantId', 'className', 'variantLabel', 'kind', 'unitName', 'decimals', 'quantity', 'amount', 'unitPrice', 'unitCost', 'lineTotal'],
   inputs: ['classId', 'amount'],
   outputs: ['classId', 'amount'],
-  costs: ['mode', 'materials', 'materialsComplete', 'extras', 'total', 'allocation'],
+  costs: ['mode', 'materials', 'materialsComplete', 'labour', 'extras', 'total', 'allocation'],
+  labour: ['levelId', 'levelName', 'minutes', 'hourlyRate', 'amount'],
   extras: ['label', 'amount'],
   allocation: ['classId', 'share'],
   shares: ['classId', 'share'],
@@ -59,5 +63,5 @@ export const META_JSON = 'meta.json';
 
 /** Content of meta.json for a new data repo (§3.7). */
 export function metaContent(createdAt: string): string {
-  return JSON.stringify({ app: 'sales-bookkeeping', schemaVersion: 1, createdAt }, null, 2) + '\n';
+  return JSON.stringify({ app: 'sales-bookkeeping', schemaVersion: SCHEMA_VERSION, createdAt }, null, 2) + '\n';
 }

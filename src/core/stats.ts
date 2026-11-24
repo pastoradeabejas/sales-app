@@ -1,7 +1,7 @@
 // Statistics (spec §4.4): pure functions over orders, payments and computed balances. Voided records are always excluded.
 import { avgDaysToPay, daysBetween, oldestUnpaidDays } from './payments.ts';
 import type { ClientBalance } from './payments.ts';
-import type { Client, IsoDate, Order, OrderLine, Payment, VariantKind } from './types.ts';
+import type { Client, IsoDate, Order, OrderLine, Payment, ProductClass, Purchase, StockEvent, VariantKind } from './types.ts';
 
 /** Inclusive date range. */
 export type Range = { from: IsoDate; to: IsoDate };
@@ -243,4 +243,47 @@ export function profit(orders: Order[], r: Range, f: StatsFilter = {}): { revenu
     }
   }
   return { revenueWithCost: known, cost, profit: known - cost, coveredShare: all === 0 ? 0 : known / all };
+}
+
+export interface ProfitSummary {
+  sales: number;
+  /** Cost of the sold lines with a known cost (materials and labour inside). */
+  cogs: number;
+  coveredShare: number;
+  /** Sales with known cost − cogs. */
+  gross: number;
+  /** Purchase lines that add no stock (class without stock tracking). */
+  expenses: number;
+  net: number;
+  /** Labour booked in transforms; information only, already inside product costs. */
+  labour: number;
+  /** All purchases: stock and expenses. */
+  spent: number;
+}
+
+/** Profit card figures over a range (§16.6). */
+export function profitSummary(
+  orders: Order[],
+  purchases: Purchase[],
+  events: StockEvent[],
+  classesById: Map<string, Pick<ProductClass, 'trackStock'>>,
+  r: Range,
+): ProfitSummary {
+  const p = profit(orders, r);
+  let expenses = 0;
+  let spent = 0;
+  for (const pu of purchases) {
+    if (pu.voided || !inRange(pu.date, r)) continue;
+    spent += pu.total;
+    for (const l of pu.lines) if (classesById.get(l.classId)?.trackStock === false) expenses += l.lineTotal;
+  }
+  let labour = 0;
+  for (const e of events) {
+    if (e.voided || e.type !== 'transform' || !inRange(e.date, r)) continue;
+    for (const l of e.costs?.labour ?? []) labour += l.amount;
+  }
+  return {
+    sales: revenue(orders, r), cogs: p.cost, coveredShare: p.coveredShare, gross: p.profit,
+    expenses, net: p.profit - expenses, labour, spent,
+  };
 }

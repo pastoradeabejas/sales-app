@@ -7,6 +7,7 @@ const KIND: Record<Movement['kind'], string> = {
   add: 'added',
   remove: 'removed',
   sale: 'sale',
+  purchase: 'purchase',
   'transform-in': 'transform',
   'transform-out': 'transform',
 };

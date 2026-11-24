@@ -11,6 +11,7 @@
   import { isConfigured } from '../../store/settings.ts';
   import Backup from './settings/Backup.svelte';
   import SyncSettings from './settings/SyncSettings.svelte';
+  import WorkLevels from './settings/WorkLevels.svelte';
 
 
   const configured = $derived(isConfigured(app.settings));
@@ -59,7 +60,7 @@
     </section>
   {/if}
 
-  {#if configured}<Backup />{/if}
+  {#if configured}<WorkLevels /><Backup />{/if}
 
   <section class="card stack">
     <h2>Appearance</h2>

@@ -3,7 +3,7 @@ import { fullName } from './groups.ts';
 import { allocateAll, orderState } from './payments.ts';
 import type { ClientBalance } from './payments.ts';
 import { toBaseUnits } from './quantity.ts';
-import type { Cents, Client, Order, Payment, ProductClass, StockEvent, UnitCost } from './types.ts';
+import type { Cents, Client, Order, Payment, ProductClass, Purchase, StockEvent, Supplier, UnitCost } from './types.ts';
 
 type Cell = string | number | null | boolean;
 
@@ -75,15 +75,32 @@ export function stockCsv(events: StockEvent[], classesById: Map<string, ProductC
   );
 }
 
+/** Purchases export: one row per line. */
+export function purchasesCsv(purchases: Purchase[]): string {
+  return toCsv(
+    ['date', 'purchase_id', 'supplier', 'item', 'amount', 'unit', 'line_total_eur', 'method', 'note', 'voided'],
+    purchases.flatMap((p) =>
+      p.lines.map((l) => [p.date, p.id, p.supplierName, l.className, toBaseUnits(l.amount, l.decimals), l.unitName, euros(l.lineTotal), p.method, p.note, p.voided]),
+    ),
+  );
+}
+
+/** Suppliers export: one row per supplier. */
+export function suppliersCsv(suppliers: Supplier[]): string {
+  return toCsv(['name', 'phone', 'notes', 'archived'], suppliers.map((s) => [s.name, s.phone, s.notes, s.archived]));
+}
+
 export interface ExportData {
   orders: Order[];
   payments: Payment[];
   clients: Client[];
   stock: StockEvent[];
   classes: ProductClass[];
+  purchases: Purchase[];
+  suppliers: Supplier[];
 }
 
-/** All five CSV files, named sales-<kind>-<today>.csv. */
+/** All seven CSV files, named sales-<kind>-<today>.csv. */
 export function exportFiles(d: ExportData, today: string): { name: string; content: string }[] {
   const files: [string, string][] = [
     ['orders', ordersCsv(d.orders, d.payments)],
@@ -91,6 +108,8 @@ export function exportFiles(d: ExportData, today: string): { name: string; conte
     ['payments', paymentsCsv(d.payments, new Map(d.clients.map((c) => [c.id, c])))],
     ['clients', clientsCsv(d.clients, allocateAll(d.orders, d.payments))],
     ['stock', stockCsv(d.stock, new Map(d.classes.map((c) => [c.id, c])))],
+    ['purchases', purchasesCsv(d.purchases)],
+    ['suppliers', suppliersCsv(d.suppliers)],
   ];
   return files.map(([kind, content]) => ({ name: `sales-${kind}-${today}.csv`, content }));
 }

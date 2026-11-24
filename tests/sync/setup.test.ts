@@ -40,7 +40,7 @@ describe('meta.json (§3.7)', () => {
   });
 
   it('reports a newer schema as tooNew (read-only)', async () => {
-    const fake = fakeGitHub({ 'meta.json': '{ "app": "sales-bookkeeping", "schemaVersion": 2 }\n' });
+    const fake = fakeGitHub({ 'meta.json': '{ "app": "sales-bookkeeping", "schemaVersion": 3 }\n' });
     expect(await ensureMeta(gh(fake), NOW)).toBe('tooNew');
     expect(checkMeta('{"schemaVersion":1}')).toEqual({ schemaVersion: 1, tooNew: false });
     expect(checkMeta('{"schemaVersion":3}')).toEqual({ schemaVersion: 3, tooNew: true });

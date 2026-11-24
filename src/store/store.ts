@@ -1,5 +1,5 @@
 // Local store (spec §5): records, outbox and sync bookkeeping over a Backend; every write is one transaction.
-import { SCHEMA_VERSION, type Id, type RecordType, type Stamped, type Timestamp } from '../core/types.ts';
+import { RECORD_SCHEMA, type Id, type RecordType, type Stamped, type Timestamp } from '../core/types.ts';
 import type { Backend, Key, StoreName, TableName, Tx } from './backend.ts';
 
 export type { StoreName, TableName } from './backend.ts';
@@ -12,6 +12,9 @@ export const STORE_OF: Record<RecordType, StoreName> = {
   payment: 'payments',
   stock: 'stock',
   recipe: 'recipes',
+  supplier: 'suppliers',
+  purchase: 'purchases',
+  level: 'levels',
 };
 
 /** One pending push of a record file (§5, §6.2); content is the record object, serialised at push time. */
@@ -53,12 +56,13 @@ export interface StoreOptions {
 
 export type Store = ReturnType<typeof createStore>;
 
-const ALL: TableName[] = ['products', 'clients', 'orders', 'payments', 'stock', 'recipes', 'files', 'outbox', 'meta'];
+const ALL: TableName[] = ['products', 'clients', 'orders', 'payments', 'stock', 'recipes', 'suppliers', 'purchases', 'levels', 'files', 'outbox', 'meta'];
 const unique = <T>(xs: T[]) => [...new Set(xs)];
 
-// Transforms get a derived `classIds` field so the multi-entry index can find them; it never leaves the store.
+// Transforms and purchases get a derived `classIds` field so the multi-entry index can find them; it never leaves the store.
 type Row = Record<string, unknown>;
 function toRow(store: StoreName, rec: Row): Row {
+  if (store === 'purchases') return { ...rec, classIds: unique((rec.lines as { classId: Id }[]).map((l) => l.classId)) };
   if (store !== 'stock' || rec.type !== 'transform') return rec;
   const sides = [...(rec.inputs as { classId: Id }[]), ...(rec.outputs as { classId: Id }[])];
   return { ...rec, classIds: unique(sides.map((s) => s.classId)) };
@@ -118,7 +122,7 @@ export function createStore(backend: Backend, opts: StoreOptions = {}) {
         if (stamp) {
           const old = await t.get<Row>(store, record.id);
           const ts = now();
-          rec = { ...rec, schema: rec.schema ?? SCHEMA_VERSION, createdAt: old?.createdAt ?? rec.createdAt ?? ts, updatedAt: ts, updatedBy: deviceName() };
+          rec = { ...rec, schema: rec.schema ?? RECORD_SCHEMA, createdAt: old?.createdAt ?? rec.createdAt ?? ts, updatedAt: ts, updatedBy: deviceName() };
         }
         await t.put(store, toRow(store, rec));
         if (outbox) await enqueue(t, type, rec as { id: Id }, await pathOf(t, type, record.id, path));

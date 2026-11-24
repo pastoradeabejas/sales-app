@@ -58,12 +58,42 @@ describe('serializeRecord', () => {
 
 describe('meta and parse', () => {
   it('builds meta.json', () => {
-    expect(JSON.parse(metaContent('2026-11-22T10:00:00Z'))).toEqual({ app: 'sales-bookkeeping', schemaVersion: 1, createdAt: '2026-11-22T10:00:00Z' });
+    expect(JSON.parse(metaContent('2026-11-22T10:00:00Z'))).toEqual({ app: 'sales-bookkeeping', schemaVersion: 2, createdAt: '2026-11-22T10:00:00Z' });
     expect(metaContent('t').endsWith('\n')).toBe(true);
     expect(META_JSON).toBe('meta.json');
   });
   it('parseRecord throws a clear error', () => {
     expect(() => parseRecord('client', '{oops')).toThrow(/client/);
     expect(parseRecord('client', '{"id":"a"}')).toEqual({ id: 'a' });
+  });
+});
+
+describe('v1.4 records (spec §16)', () => {
+  it('orders supplier, level and purchase keys', () => {
+    expect(keysOf(serializeRecord('supplier', { updatedBy: 'x', archived: false, notes: '', phone: '', name: 'S', schema: 1, id: 'a' })))
+      .toEqual(['id', 'schema', 'name', 'phone', 'notes', 'archived', 'updatedBy']);
+    expect(keysOf(serializeRecord('level', { archived: false, hourlyRate: 1200, name: 'Level 1', id: 'a' })))
+      .toEqual(['id', 'name', 'hourlyRate', 'archived']);
+    const o = JSON.parse(serializeRecord('purchase', {
+      voided: false, note: '', method: 'cash', total: 1,
+      lines: [{ lineTotal: 1, amount: 1, decimals: 0, unitName: 'pcs', className: 'Lid', classId: 'c', lineId: 'l' }],
+      supplierName: 'S', supplierId: null, date: 'd', id: 'a',
+    }));
+    expect(Object.keys(o)).toEqual(['id', 'date', 'supplierId', 'supplierName', 'lines', 'total', 'method', 'note', 'voided']);
+    expect(Object.keys(o.lines[0])).toEqual(['lineId', 'classId', 'className', 'unitName', 'decimals', 'amount', 'lineTotal']);
+  });
+  it('orders labour in recipes and transform costs', () => {
+    const r = JSON.parse(serializeRecord('recipe', { archived: false, labour: [{ minutes: 40, levelId: 'L' }], shares: [], extras: [], name: 'R', id: 'a' }));
+    expect(Object.keys(r)).toEqual(['id', 'name', 'extras', 'shares', 'labour', 'archived']);
+    expect(Object.keys(r.labour[0])).toEqual(['levelId', 'minutes']);
+    const t = JSON.parse(serializeRecord('stock', {
+      costs: { allocation: [], total: 1, extras: [], labour: [{ amount: 8000, hourlyRate: 1200, minutes: 400, levelName: 'L1', levelId: 'L' }], materialsComplete: true, materials: 1, mode: 'breakdown' },
+      type: 'transform', id: 'a',
+    }));
+    expect(Object.keys(t.costs)).toEqual(['mode', 'materials', 'materialsComplete', 'labour', 'extras', 'total', 'allocation']);
+    expect(Object.keys(t.costs.labour[0])).toEqual(['levelId', 'levelName', 'minutes', 'hourlyRate', 'amount']);
+  });
+  it('a new data repo starts at the current schema', () => {
+    expect(JSON.parse(metaContent('t')).schemaVersion).toBe(2);
   });
 });

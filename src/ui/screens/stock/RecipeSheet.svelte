@@ -8,6 +8,7 @@
   import { validateTransform } from '../../../core/stock.ts';
   import { fullName } from '../../../core/groups.ts';
   import { pickerGroups } from '../products/tree.ts';
+  import { labourRows } from '../settings/levels.ts';
   import type { ClassAmount, CostExtra, Decimals, Recipe } from '../../../core/types.ts';
   import { app, freshRecord, saveRecipe, view } from '../../data.svelte.ts';
   import { showToast } from '../../toast.svelte.ts';
@@ -39,6 +40,7 @@
   let inputs = $state<Row[]>([]);
   let outputs = $state<Row[]>([]);
   let extras = $state<{ label: string; text: string }[]>([]);
+  let labour = $state<{ levelId: string; text: string }[]>([]);
   let shareTexts = $state<string[]>([]);
   let tried = $state(false);
   let archiving = $state(false);
@@ -49,12 +51,15 @@
     inputs = [{ classId: '', text: '' }];
     outputs = initialOutput ? toRows([initialOutput]) : [{ classId: '', text: '' }];
     extras = [];
+    labour = [];
     shareTexts = equalPercents(1);
     tried = false;
   });
 
   const amountOf = (r: Row) => (r.classId && r.text.trim() ? parseAmount(r.text, decimalsOf(r.classId)) : null);
   const list = (rows: Row[]): ClassAmount[] => rows.map((r) => ({ classId: r.classId, amount: amountOf(r) ?? 0 }));
+  const levels = $derived(app.levels.filter((l) => !l.archived).slice().sort((a, b) => a.name.localeCompare(b.name)));
+  const levelName = (id: string) => view.levelsById.get(id)?.name ?? 'Unknown level';
   const shareSum = $derived(shareTexts.reduce((s, t) => s + (Number(t.replace(',', '.')) || 0), 0));
 
   function addRow(rows: Row[], isOut: boolean) {
@@ -88,13 +93,15 @@
       }
       kept.push({ label: x.label.trim() || 'Other', amount });
     }
+    const lab = labourRows(labour);
+    if (lab.error) errors.push(lab.error);
     let shares: Recipe['shares'] = [];
     if (outs.length > 1) {
       const s = percentsToShares(outs.map((o) => o.classId), shareTexts);
       if (!s || !sharesValid(s)) errors.push('Shares must add up to 100%.');
       else shares = s;
     }
-    return { errors, ins, outs, extras: kept, shares };
+    return { errors, ins, outs, extras: kept, labour: lab.rows, shares };
   });
 
   async function save(e: SubmitEvent) {
@@ -103,6 +110,7 @@
     if (nameError || built.errors.length) return;
     const r = await saveRecipe({
       ...freshRecord(), archived: false, name: name.trim(), inputs: built.ins, outputs: built.outs, extras: built.extras, shares: built.shares,
+      ...(built.labour.length ? { labour: built.labour } : {}),
     });
     showToast('Recipe added');
     open = false;
@@ -170,6 +178,12 @@
           {#each recipe.extras as x, i (i)}<div class="row-between"><span>{x.label}</span><b>{formatMoney(x.amount)}</b></div>{/each}
         </section>
       {/if}
+      {#if recipe.labour?.length}
+        <section class="group">
+          <h3>Labour</h3>
+          {#each recipe.labour as x (x.levelId)}<div class="row-between"><span>{levelName(x.levelId)}</span><b>{x.minutes} min</b></div>{/each}
+        </section>
+      {/if}
       <p class="hint">Recipes can't be changed. For a different transform, create a new recipe.</p>
       {#if !recipe.archived}
         <button type="button" class="btn btn-danger btn-block" onclick={() => (archiving = true)}>Archive recipe</button>
@@ -209,6 +223,27 @@
           <input class="input" aria-label="Extra {i + 1} label" placeholder="Label" bind:value={x.label} />
           <input class="input" inputmode="decimal" aria-label="Extra {i + 1} amount in euros" placeholder="€" bind:value={x.text} />
           <button type="button" class="step plain" aria-label="Remove extra {i + 1}" onclick={() => extras.splice(i, 1)}><Icon name="close" size={18} /></button>
+        </div>
+      {/each}
+    </section>
+
+    <section class="group">
+      <div class="section-head">
+        <h3>Labour <span class="muted">(optional)</span></h3>
+        <button type="button" class="btn-ghost link" disabled={labour.length >= MAX_ROWS || labour.length >= levels.length} onclick={() => labour.push({ levelId: '', text: '' })}>+ Add labour</button>
+      </div>
+      {#if !levels.length}<p class="hint">Add work levels in Settings.</p>{/if}
+      {#each labour as x, i (i)}
+        <div class="extra">
+          <select class="input" aria-label="Labour {i + 1} level" bind:value={x.levelId}>
+            <option value="" disabled>Level…</option>
+            {#each levels as l (l.id)}<option value={l.id} disabled={labour.some((y, j) => j !== i && y.levelId === l.id)}>{l.name}</option>{/each}
+          </select>
+          <div class="suffix">
+            <input class="input" inputmode="numeric" autocomplete="off" aria-label="Labour {i + 1} minutes" placeholder="0" bind:value={x.text} />
+            <span aria-hidden="true">min</span>
+          </div>
+          <button type="button" class="step plain" aria-label="Remove labour {i + 1}" onclick={() => labour.splice(i, 1)}><Icon name="close" size={18} /></button>
         </div>
       {/each}
     </section>
