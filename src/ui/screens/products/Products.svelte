@@ -1,5 +1,6 @@
 <script lang="ts">
   import Header from '../../components/Header.svelte';
+  import TabSwitch from '../../components/TabSwitch.svelte';
   import Icon from '../../components/Icon.svelte';
   import Tag from '../../components/Tag.svelte';
   import Sheet from '../../components/Sheet.svelte';
@@ -241,6 +242,7 @@
     <a class="btn btn-primary" href="#/products/new">+ New product</a>
   {/snippet}
 </Header>
+<TabSwitch side="products" />
 
 <div class="page">
   {#if app.products.length === 0}

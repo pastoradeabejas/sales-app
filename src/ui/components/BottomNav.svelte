@@ -1,16 +1,16 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
   import { config } from '../../config.ts';
-  import type { Tab } from '../router.ts';
+  import { sides } from '../router.svelte.ts';
+  import { tabHref, type Tab } from '../router.ts';
 
   let { active }: { active: Tab } = $props();
 
   const tabs: { tab: Tab; label: string }[] = [
     { tab: 'overview', label: 'Overview' },
     { tab: 'orders', label: 'Orders' },
-    { tab: 'clients', label: 'Clients' },
+    { tab: 'expenses', label: 'Expenses' },
     { tab: 'stock', label: 'Stock' },
-    { tab: 'products', label: 'Products' },
   ];
 </script>
 
@@ -20,7 +20,7 @@
     {config.appName}
   </span>
   {#each tabs as { tab, label } (tab)}
-    <a href="#/{tab}" aria-current={tab === active ? 'page' : undefined}>
+    <a href={tabHref(tab, sides)} aria-current={tab === active ? 'page' : undefined}>
       <Icon name={tab} size={22} />
       <span>{label}</span>
     </a>
@@ -32,7 +32,7 @@
     position: fixed;
     inset: auto 0 0 0;
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     min-height: var(--nav-h);
     padding-bottom: env(safe-area-inset-bottom);
     background: var(--surface);

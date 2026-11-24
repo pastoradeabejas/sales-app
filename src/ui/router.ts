@@ -1,6 +1,6 @@
 // Hash routes (spec §7, plus #/orders/:id/edit from §8.4). Pure: no DOM.
 
-export type Tab = 'overview' | 'orders' | 'clients' | 'stock' | 'products';
+export type Tab = 'overview' | 'orders' | 'expenses' | 'stock';
 
 const routes = [
   ['overview', 'overview', 'overview'],
@@ -9,15 +9,21 @@ const routes = [
   ['order-new', 'orders/new', 'orders'],
   ['order', 'orders/:id', 'orders'],
   ['order-edit', 'orders/:id/edit', 'orders'],
-  ['clients', 'clients', 'clients'],
-  ['client', 'clients/:id', 'clients'],
+  ['clients', 'clients', 'orders'],
+  ['client', 'clients/:id', 'orders'],
   ['stock', 'stock', 'stock'],
   ['stock-add', 'stock/add', 'stock'],
   ['stock-remove', 'stock/remove', 'stock'],
   ['stock-transform', 'stock/transform', 'stock'],
   ['stock-class', 'stock/:classId', 'stock'],
-  ['products', 'products', 'products'],
-  ['product', 'products/:classId', 'products'],
+  ['products', 'products', 'stock'],
+  ['product', 'products/:classId', 'stock'],
+  ['purchases', 'purchases', 'expenses'],
+  ['purchase-new', 'purchases/new', 'expenses'],
+  ['purchase', 'purchases/:id', 'expenses'],
+  ['purchase-edit', 'purchases/:id/edit', 'expenses'],
+  ['suppliers', 'suppliers', 'expenses'],
+  ['supplier', 'suppliers/:id', 'expenses'],
 ] as const satisfies readonly (readonly [string, string, Tab])[];
 
 export type RouteName = (typeof routes)[number][0];
@@ -55,4 +61,31 @@ export function tabOf(name: RouteName): Tab {
 export function parseQuery(hash: string): Record<string, string> {
   const q = hash.indexOf('?');
   return q < 0 ? {} : Object.fromEntries(new URLSearchParams(hash.slice(q + 1)));
+}
+
+/** The two list screens (sides) of each two-sided tab; the first is the default. */
+export const SIDES: Record<string, string[]> = {
+  orders: ['orders', 'clients'],
+  expenses: ['purchases', 'suppliers'],
+  stock: ['stock', 'products'],
+};
+
+export const SIDES_KEY = 'tabSides';
+
+/** Hash of a tab's nav link: the remembered side if valid, else the first side. */
+export function tabHref(tab: Tab, remembered: Record<string, string>): string {
+  const sides = SIDES[tab];
+  if (!sides) return `#/${tab}`;
+  return `#/${sides.includes(remembered[tab]) ? remembered[tab] : sides[0]}`;
+}
+
+/** Reads the stored remembered sides, dropping invalid JSON and values. */
+export function parseSides(raw: string | null): Record<string, string> {
+  try {
+    const v = JSON.parse(raw ?? '{}');
+    if (!v || typeof v !== 'object') return {};
+    return Object.fromEntries(Object.entries(v).filter(([tab, side]) => SIDES[tab]?.includes(side as string))) as Record<string, string>;
+  } catch {
+    return {};
+  }
 }

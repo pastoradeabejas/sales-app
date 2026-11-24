@@ -4,6 +4,7 @@
   import Avatar from '../../components/Avatar.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import Header from '../../components/Header.svelte';
+  import TabSwitch from '../../components/TabSwitch.svelte';
   import SearchField from '../../components/SearchField.svelte';
   import Segmented from '../../components/Segmented.svelte';
   import GoneQuiet from './GoneQuiet.svelte';
@@ -32,6 +33,7 @@
     <button type="button" class="btn btn-primary" onclick={() => (adding = true)}>+ New client</button>
   {/snippet}
 </Header>
+<TabSwitch side="clients" />
 
 <div class="page">
   <SearchField bind:value={search} label="Search clients" placeholder="Search name, phone or tag" />

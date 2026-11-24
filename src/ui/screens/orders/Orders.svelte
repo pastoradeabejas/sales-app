@@ -2,6 +2,7 @@
   import Chips from '../../components/Chips.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import Header from '../../components/Header.svelte';
+  import TabSwitch from '../../components/TabSwitch.svelte';
   import SearchField from '../../components/SearchField.svelte';
   import StatusTag from '../../components/StatusTag.svelte';
   import { formatMoney } from '../../../core/money.ts';
@@ -34,6 +35,7 @@
 </script>
 
 <Header title="Orders" />
+<TabSwitch side="orders" />
 <div class="page">
   <SearchField bind:value={search} label="Search orders" placeholder="Search client, product, note" />
   <Chips options={chips} bind:value={status} label="Filter by status" />

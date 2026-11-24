@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseQuery, parseRoute, tabOf } from '../../src/ui/router.ts';
+import { SIDES, parseQuery, parseRoute, parseSides, tabHref, tabOf } from '../../src/ui/router.ts';
 
 describe('parseRoute', () => {
   it.each([
@@ -18,6 +18,12 @@ describe('parseRoute', () => {
     ['#/products', 'products', {}],
     ['#/products/cls1', 'product', { classId: 'cls1' }],
     ['#/settings', 'settings', {}],
+    ['#/purchases', 'purchases', {}],
+    ['#/purchases/new', 'purchase-new', {}],
+    ['#/purchases/p1', 'purchase', { id: 'p1' }],
+    ['#/purchases/p1/edit', 'purchase-edit', { id: 'p1' }],
+    ['#/suppliers', 'suppliers', {}],
+    ['#/suppliers/s1', 'supplier', { id: 's1' }],
   ])('%s -> %s', (hash, name, params) => {
     expect(parseRoute(hash)).toEqual({ name, params });
   });
@@ -45,17 +51,45 @@ describe('tabOf', () => {
     ['order-new', 'orders'],
     ['order', 'orders'],
     ['order-edit', 'orders'],
-    ['clients', 'clients'],
-    ['client', 'clients'],
+    ['clients', 'orders'],
+    ['client', 'orders'],
     ['stock', 'stock'],
     ['stock-add', 'stock'],
     ['stock-remove', 'stock'],
     ['stock-transform', 'stock'],
     ['stock-class', 'stock'],
-    ['products', 'products'],
-    ['product', 'products'],
+    ['products', 'stock'],
+    ['product', 'stock'],
+    ['purchases', 'expenses'],
+    ['purchase-new', 'expenses'],
+    ['purchase', 'expenses'],
+    ['purchase-edit', 'expenses'],
+    ['suppliers', 'expenses'],
+    ['supplier', 'expenses'],
   ] as const)('%s is in the %s tab', (name, tab) => {
     expect(tabOf(name)).toBe(tab);
+  });
+});
+
+describe('tab sides', () => {
+  it('lists the two sides of each tab', () => {
+    expect(SIDES).toEqual({ orders: ['orders', 'clients'], expenses: ['purchases', 'suppliers'], stock: ['stock', 'products'] });
+  });
+
+  it('builds the tab href from the remembered side', () => {
+    expect(tabHref('overview', {})).toBe('#/overview');
+    expect(tabHref('orders', {})).toBe('#/orders');
+    expect(tabHref('orders', { orders: 'clients' })).toBe('#/clients');
+    expect(tabHref('expenses', { expenses: 'suppliers' })).toBe('#/suppliers');
+    expect(tabHref('stock', { stock: 'clients' })).toBe('#/stock');
+  });
+
+  it('parses the stored sides and ignores bad input', () => {
+    expect(parseSides('{"orders":"clients","stock":"products"}')).toEqual({ orders: 'clients', stock: 'products' });
+    expect(parseSides('{"orders":"products","x":"y"}')).toEqual({});
+    expect(parseSides('nope')).toEqual({});
+    expect(parseSides(null)).toEqual({});
+    expect(parseSides('[1]')).toEqual({});
   });
 });
 

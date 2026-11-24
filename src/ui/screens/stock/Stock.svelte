@@ -1,6 +1,7 @@
 <script lang="ts">
   import EmptyState from '../../components/EmptyState.svelte';
   import Header from '../../components/Header.svelte';
+  import TabSwitch from '../../components/TabSwitch.svelte';
   import Icon from '../../components/Icon.svelte';
   import Tag from '../../components/Tag.svelte';
   import { buildTree } from '../../../core/groups.ts';
@@ -41,6 +42,7 @@
 </script>
 
 <Header title="Stock" />
+<TabSwitch side="stock" />
 
 <div class="page">
   <section class="big-actions">

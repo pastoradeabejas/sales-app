@@ -1,8 +1,10 @@
 <script lang="ts">
   import Icon from './Icon.svelte';
+
+  let { href = '#/orders/new', label = 'New order' }: { href?: string; label?: string } = $props();
 </script>
 
-<a href="#/orders/new"><Icon name="plus" size={20} /> New order</a>
+<a {href}><Icon name="plus" size={20} /> {label}</a>
 
 <style>
   a {
