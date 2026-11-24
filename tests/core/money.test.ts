@@ -45,6 +45,12 @@ describe('parseMoney', () => {
     expect(parseMoney('0')).toBe(0);
     expect(parseMoney('1000000')).toBe(100000000);
   });
+  it('accepts thousands separators when both marks are used (the last one is the decimal mark)', () => {
+    expect(parseMoney('€1,234.50')).toBe(123450);
+    expect(parseMoney('1.234,50')).toBe(123450);
+    expect(parseMoney('1,000,000.00')).toBe(100000000);
+    for (const t of ['12,34.50', '1,234.5.0', '1.234,567']) expect(parseMoney(t), t).toBeNull();
+  });
   it('rejects', () => {
     for (const t of ['', ' ', 'abc', '-3', '1.234', '1000000.01', '1,2,3', '1..2'])
       expect(parseMoney(t), t).toBeNull();

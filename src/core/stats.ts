@@ -222,8 +222,8 @@ export function unitsBought(orders: Order[], clientId: string): BoughtVariant[] 
   return [...out.values()];
 }
 
-// Line cost in cents, rounded half up; null when unknown.
-function lineCost(l: OrderLine): number | null {
+/** Line cost in cents, rounded half up; null when unknown. */
+export function lineCost(l: OrderLine): number | null {
   if (l.unitCost === null) return null;
   const raw = l.kind === 'fixed' ? (l.quantity ?? 0) * l.unitCost : (l.amount * l.unitCost) / 10 ** l.decimals;
   return Math.round(Number(raw.toFixed(6)));

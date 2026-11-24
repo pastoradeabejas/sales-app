@@ -1,5 +1,5 @@
 // Profit tab figures (D-031): periods, KPIs, breakdowns, inventory value and the monthly trend.
-import { inRange, profitSummary, revenue, type ProfitSummary, type Range } from './stats.ts';
+import { inRange, lineCost, profitSummary, revenue, type ProfitSummary, type Range } from './stats.ts';
 import type { Decimals, IsoDate, Order, OrderLine, ProductClass, Purchase, StockEvent } from './types.ts';
 
 export type PeriodKind = 'month' | 'quarter' | 'year' | 'custom';
@@ -72,13 +72,6 @@ export function expensesByItem(
   return [...sums]
     .map(([classId, amount]) => ({ classId, name: classesById.get(classId)?.name ?? classId, amount, share: total ? amount / total : 0 }))
     .sort((a, b) => b.amount - a.amount);
-}
-
-// Same rule as stats.ts: fixed = quantity × unitCost, variable = amount × unitCost / 10^decimals.
-function lineCost(l: OrderLine): number | null {
-  if (l.unitCost === null) return null;
-  const raw = l.kind === 'fixed' ? (l.quantity ?? 0) * l.unitCost : (l.amount * l.unitCost) / 10 ** l.decimals;
-  return Math.round(Number(raw.toFixed(6)));
 }
 
 type Acc = { sales: number; known: number; cost: number };

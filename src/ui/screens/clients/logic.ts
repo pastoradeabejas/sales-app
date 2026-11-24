@@ -2,6 +2,7 @@
 import { normalizeName } from '../../../core/clients.ts';
 import type { ClientBalance } from '../../../core/payments.ts';
 import type { Client, Order, Payment, PaymentMethod } from '../../../core/types.ts';
+import { MONTHS } from '../../months.ts';
 
 export type ClientSort = 'owed' | 'name' | 'last';
 
@@ -66,7 +67,6 @@ export function parseTags(text: string): string[] {
   return out;
 }
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 /** "2026-11-22" -> "22 Nov". */
 export function shortDate(iso: string): string {
   return `${Number(iso.slice(8, 10))} ${MONTHS[Number(iso.slice(5, 7)) - 1]}`;

@@ -6,8 +6,8 @@ import { buildLine } from '../../../core/orders.ts';
 import { allocateClient, type OrderStatus } from '../../../core/payments.ts';
 import { formatAmount } from '../../../core/quantity.ts';
 import type { Cents, Client, Id, IsoDate, Order, OrderLine, Payment, ProductClass, Scaled, Variant } from '../../../core/types.ts';
+import { MONTHS } from '../../months.ts';
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const utc = (d: IsoDate) => new Date(`${d}T00:00:00Z`);

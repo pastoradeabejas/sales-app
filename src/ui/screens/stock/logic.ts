@@ -5,6 +5,7 @@ import { fullName } from '../../../core/groups.ts';
 import { formatAmount } from '../../../core/quantity.ts';
 import { daysLeft, type Movement } from '../../../core/stock.ts';
 import type { ClassAmount, CostExtra, CostShare, Decimals, Id, LabourCost, LabourRow, ProductClass, Scaled, TransformCosts } from '../../../core/types.ts';
+import { shortDay } from '../orders/logic.ts';
 
 /** Stock before and after an add or remove; an add on negative stock starts from 0 (§4.3). */
 export function movePreview(stock: Scaled, type: 'add' | 'remove', amount: Scaled | null) {
@@ -118,17 +119,12 @@ export function costsFromForm(
   return { costs, error: '' };
 }
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const dayNumber = (date: string) => Date.UTC(+date.slice(0, 4), +date.slice(5, 7) - 1, +date.slice(8, 10)) / 86_400_000;
 export const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-/** "today", "yesterday", "3 Nov", or "31 Dec 2025" in another year. */
+/** "today", "yesterday", "3 Nov", or "31 Dec 2025" in another year (shortDay, lowercase in sentences). */
 export function dayLabel(date: string, today: string): string {
-  const diff = dayNumber(today) - dayNumber(date);
-  if (diff === 0) return 'today';
-  if (diff === 1) return 'yesterday';
-  const d = `${+date.slice(8, 10)} ${MONTHS[+date.slice(5, 7) - 1]}`;
-  return date.slice(0, 4) === today.slice(0, 4) ? d : `${d} ${date.slice(0, 4)}`;
+  return shortDay(date, today).replace(/^(Today|Yesterday)$/, (w) => w.toLowerCase());
 }
 
 /** History label (§8.12): Add / Remove (reason) / Transform in (from Milk) / Transform out (to Yogurt) / Sale (client). */

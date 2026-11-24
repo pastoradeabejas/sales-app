@@ -3,6 +3,7 @@ import { formatAmount } from '../../../core/quantity.ts';
 import { rangeFor } from '../../../core/stats.ts';
 import type { Decimals } from '../../../core/types.ts';
 import type { Bucket, ClassSold, Metric, Range, VariantSold } from '../../../core/stats.ts';
+import { MONTHS } from '../../months.ts';
 
 export type RangeKind = 'week' | 'month' | 'year' | 'custom';
 
@@ -54,7 +55,6 @@ export function splitText(v: VariantSold, c: ClassSold): { paidPct: number; unpa
 /** Piece classes chart items sold, others chart the amount. */
 export const seriesMetric = (c: ClassSold): Metric => (c.variants.every((v) => v.kind === 'fixed') ? 'units' : 'amount');
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 export function bucketLabel(start: string, bucket: Bucket): string {
   const month = MONTHS[Number(start.slice(5, 7)) - 1];
   return bucket === 'month' ? month : `${Number(start.slice(8, 10))} ${month}`;

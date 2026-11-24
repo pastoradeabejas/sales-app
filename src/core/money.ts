@@ -29,9 +29,19 @@ export function formatUnitCost(cost: UnitCost): string {
   return cost < 0 ? `−${body}` : body;
 }
 
+// With both "," and "." the last one is the decimal mark and the other groups thousands ("1,234.50", "1.234,50").
+function dropThousands(s: string): string {
+  const dec = s.lastIndexOf(',') > s.lastIndexOf('.') ? ',' : '.';
+  const sep = dec === ',' ? '.' : ',';
+  const parts = s.split(dec);
+  const [int, frac] = parts;
+  return parts.length === 2 && new RegExp(`^\\d{1,3}(\\${sep}\\d{3})+$`).test(int) ? `${int.replaceAll(sep, '')}.${frac}` : 'x';
+}
+
 // Parse euros text to a number of euros (max `maxDecimals` decimals), or null.
 function parseEuros(text: string, maxDecimals: number): number | null {
-  const s = text.replace(/[€\s]/g, '').replace(',', '.');
+  const t = text.replace(/[€\s]/g, '');
+  const s = t.includes(',') && t.includes('.') ? dropThousands(t) : t.replace(',', '.');
   if (!new RegExp(`^\\d+(\\.\\d{1,${maxDecimals}})?$`).test(s)) return null;
   const euros = Number(s);
   return euros * 100 > MAX_CENTS ? null : euros;

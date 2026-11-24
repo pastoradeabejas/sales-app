@@ -7,7 +7,7 @@ const request = <T>(r: IDBRequest<T>) =>
     r.onerror = () => reject(r.error);
   });
 
-function open(factory: IDBFactory): Promise<IDBDatabase> {
+function open(factory: IDBFactory, onClosed: () => void): Promise<IDBDatabase> {
   const r = factory.open(DB_NAME, DB_VERSION);
   r.onupgradeneeded = () => {
     for (const [name, def] of Object.entries(SCHEMA)) {
@@ -17,7 +17,11 @@ function open(factory: IDBFactory): Promise<IDBDatabase> {
     }
   };
   return request(r).then((db) => {
-    db.onversionchange = () => db.close();
+    // Another tab upgrades the database: close, and open it again on the next transaction.
+    db.onversionchange = () => {
+      db.close();
+      onClosed();
+    };
     return db;
   });
 }
@@ -27,7 +31,7 @@ export function idbBackend(factory: IDBFactory = indexedDB): Backend {
   let db: Promise<IDBDatabase> | undefined;
   return {
     async tx(tables, mode, fn) {
-      const x = (await (db ??= open(factory))).transaction(tables, mode);
+      const x = (await (db ??= open(factory, () => (db = undefined)))).transaction(tables, mode);
       const done = new Promise<void>((resolve, reject) => {
         x.oncomplete = () => resolve();
         x.onabort = () => reject(x.error ?? new Error('transaction aborted'));

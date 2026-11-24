@@ -6,10 +6,10 @@ import { isExpenseItem } from '../../../core/purchases.ts';
 import { formatAmount, parseAmount } from '../../../core/quantity.ts';
 import type { Cents, Id, IsoDate, ProductClass, Purchase, PurchaseLine, Scaled, Supplier } from '../../../core/types.ts';
 import { dayLabel } from '../orders/logic.ts';
+import { MONTH_NAMES } from '../../months.ts';
 
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-export const monthName = (date: IsoDate): string => MONTHS[Number(date.slice(5, 7)) - 1];
+export const monthName = (date: IsoDate): string => MONTH_NAMES[Number(date.slice(5, 7)) - 1];
 
 /** Non-voided spending on dates starting with `prefix` ("2026-11" or "2026"), optionally one supplier's. */
 export const spentIn = (purchases: Purchase[], prefix: string, supplierId?: Id): Cents =>
