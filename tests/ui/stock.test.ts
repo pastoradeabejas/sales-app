@@ -7,6 +7,7 @@ import {
   stepAmount,
   activeRecipes,
   recipeNameError,
+  withRecipeCosts,
   costsFromForm,
   dayLabel,
   daysLeftText,
@@ -280,5 +281,16 @@ describe('movementLabel for purchases (§16.3)', () => {
   it('names the supplier when there is one', () => {
     expect(movementLabel(m('Envases'), new Map())).toBe('Purchase (from Envases)');
     expect(movementLabel(m(''), new Map())).toBe('Purchase');
+  });
+});
+
+describe('withRecipeCosts (D-033)', () => {
+  const r = { id: 'r', name: 'Fill', inputs: [{ classId: 'a', amount: 1 }], outputs: [{ classId: 'b', amount: 1 }], extras: [], shares: [], archived: false, labour: [{ levelId: 'L1', minutes: 3 }] };
+  it('changes only labour and extras; inputs and outputs stay', () => {
+    const e = withRecipeCosts(r, [{ label: 'Labels', amount: 10 }], [{ levelId: 'L1', minutes: 2 }]);
+    expect(e).toEqual({ ...r, extras: [{ label: 'Labels', amount: 10 }], labour: [{ levelId: 'L1', minutes: 2 }] });
+  });
+  it('no labour rows removes the labour field', () => {
+    expect('labour' in withRecipeCosts(r, [], [])).toBe(false);
   });
 });

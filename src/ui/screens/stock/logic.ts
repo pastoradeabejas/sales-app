@@ -4,7 +4,7 @@ import { parseMoney } from '../../../core/money.ts';
 import { fullName } from '../../../core/groups.ts';
 import { formatAmount } from '../../../core/quantity.ts';
 import { daysLeft, type Movement } from '../../../core/stock.ts';
-import type { ClassAmount, CostShare, Decimals, Id, LabourCost, ProductClass, Scaled, TransformCosts } from '../../../core/types.ts';
+import type { ClassAmount, CostExtra, CostShare, Decimals, Id, LabourCost, LabourRow, ProductClass, Scaled, TransformCosts } from '../../../core/types.ts';
 
 /** Stock before and after an add or remove; an add on negative stock starts from 0 (§4.3). */
 export function movePreview(stock: Scaled, type: 'add' | 'remove', amount: Scaled | null) {
@@ -232,4 +232,10 @@ export function recipeNameError(name: string, recipes: { id: Id; name: string; a
   const n = name.trim().toLowerCase();
   if (!n) return 'Give the recipe a name.';
   return recipes.some((r) => !r.archived && r.id !== selfId && r.name.trim().toLowerCase() === n) ? 'A recipe with this name already exists.' : '';
+}
+
+/** A saved recipe with new labour and default extras; inputs and outputs never change (D-019, D-033). */
+export function withRecipeCosts<R extends { extras: CostExtra[]; labour?: LabourRow[] }>(recipe: R, extras: CostExtra[], labour: LabourRow[]): R {
+  const { labour: _old, ...rest } = recipe;
+  return { ...rest, extras, ...(labour.length ? { labour } : {}) } as R;
 }

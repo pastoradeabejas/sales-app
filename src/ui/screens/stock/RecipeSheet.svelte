@@ -12,10 +12,11 @@
   import type { ClassAmount, CostExtra, Decimals, Recipe } from '../../../core/types.ts';
   import { app, freshRecord, saveRecipe, view } from '../../data.svelte.ts';
   import { showToast } from '../../toast.svelte.ts';
-  import { cap, equalPercents, percentsToShares, recipeNameError, sharesToPercents, stepAmount, toInputText } from './logic.ts';
+  import { cap, equalPercents, percentsToShares, recipeNameError, sharesToPercents, stepAmount, toInputText, withRecipeCosts } from './logic.ts';
 
   // New recipe (§3.6a): name, 1-5 inputs and outputs, default extras and output shares.
-  // Recipes are never edited (D-019): with `recipe` the sheet only shows it, with Archive.
+  // With `recipe` the sheet shows it, with Archive; its labour and default extras can be edited (D-033),
+  // the inputs and outputs cannot (D-019): a different transform needs a new recipe.
   // `initialOutput` prefills a new recipe's single output (from a product page, D-015).
   let {
     open = $bindable(false),
@@ -44,6 +45,11 @@
   let shareTexts = $state<string[]>([]);
   let tried = $state(false);
   let archiving = $state(false);
+  let editing = $state(false);
+
+  $effect(() => {
+    if (!open) editing = false;
+  });
 
   $effect(() => {
     if (!open || recipe) return;
@@ -75,14 +81,9 @@
   }
 
   const nameError = $derived(recipeNameError(name, app.recipes, null));
-  const built = $derived.by(() => {
+  // Default extras and labour, shared by a new recipe and by editing a saved one.
+  const costs = $derived.by(() => {
     const errors: string[] = [];
-    if ([...inputs, ...outputs].some((r) => !r.classId || amountOf(r) === null)) errors.push('Choose a product and an amount on every row.');
-    const ins = list(inputs);
-    const outs = list(outputs);
-    for (const e of validateTransform({ inputs: ins, outputs: outs }, view.classesById)) {
-      if (!(errors.length && e.startsWith('amounts'))) errors.push(`${cap(e)}.`);
-    }
     const kept: CostExtra[] = [];
     for (const x of extras) {
       if (!x.text.trim()) continue;
@@ -95,13 +96,41 @@
     }
     const lab = labourRows(labour);
     if (lab.error) errors.push(lab.error);
+    return { errors, extras: kept, labour: lab.rows };
+  });
+
+  function startEdit() {
+    if (!recipe) return;
+    extras = recipe.extras.map((x) => ({ label: x.label, text: (x.amount / 100).toFixed(2).replace('.', ',') }));
+    labour = (recipe.labour ?? []).map((x) => ({ levelId: x.levelId, text: String(x.minutes) }));
+    tried = false;
+    editing = true;
+  }
+
+  async function saveEdit() {
+    if (!recipe) return;
+    tried = true;
+    if (costs.errors.length) return;
+    await saveRecipe(withRecipeCosts(recipe, costs.extras, costs.labour));
+    showToast(`${recipe.name} updated`);
+    editing = false;
+  }
+  const built = $derived.by(() => {
+    const errors: string[] = [];
+    if ([...inputs, ...outputs].some((r) => !r.classId || amountOf(r) === null)) errors.push('Choose a product and an amount on every row.');
+    const ins = list(inputs);
+    const outs = list(outputs);
+    for (const e of validateTransform({ inputs: ins, outputs: outs }, view.classesById)) {
+      if (!(errors.length && e.startsWith('amounts'))) errors.push(`${cap(e)}.`);
+    }
+    errors.push(...costs.errors);
     let shares: Recipe['shares'] = [];
     if (outs.length > 1) {
       const s = percentsToShares(outs.map((o) => o.classId), shareTexts);
       if (!s || !sharesValid(s)) errors.push('Shares must add up to 100%.');
       else shares = s;
     }
-    return { errors, ins, outs, extras: kept, labour: lab.rows, shares };
+    return { errors, ins, outs, extras: costs.extras, labour: costs.labour, shares };
   });
 
   async function save(e: SubmitEvent) {
@@ -124,6 +153,43 @@
     open = false;
   }
 </script>
+
+{#snippet costEditors()}
+    <section class="group">
+      <div class="section-head">
+        <h3>Default extras <span class="muted">(optional)</span></h3>
+        <button type="button" class="btn-ghost link" onclick={() => extras.push({ label: '', text: '' })}>+ Add extra</button>
+      </div>
+      {#each extras as x, i (i)}
+        <div class="extra">
+          <input class="input" aria-label="Extra {i + 1} label" placeholder="Label" bind:value={x.label} />
+          <input class="input" inputmode="decimal" aria-label="Extra {i + 1} amount in euros" placeholder="€" bind:value={x.text} />
+          <button type="button" class="step plain" aria-label="Remove extra {i + 1}" onclick={() => extras.splice(i, 1)}><Icon name="close" size={18} /></button>
+        </div>
+      {/each}
+    </section>
+
+    <section class="group">
+      <div class="section-head">
+        <h3>Labour <span class="muted">(optional)</span></h3>
+        <button type="button" class="btn-ghost link" disabled={labour.length >= MAX_ROWS || labour.length >= levels.length} onclick={() => labour.push({ levelId: '', text: '' })}>+ Add labour</button>
+      </div>
+      {#if !levels.length}<p class="hint">Add work levels in Settings.</p>{/if}
+      {#each labour as x, i (i)}
+        <div class="extra">
+          <select class="input" aria-label="Labour {i + 1} level" bind:value={x.levelId}>
+            <option value="" disabled>Level…</option>
+            {#each levels as l (l.id)}<option value={l.id} disabled={labour.some((y, j) => j !== i && y.levelId === l.id)}>{l.name}</option>{/each}
+          </select>
+          <div class="suffix">
+            <input class="input" inputmode="numeric" autocomplete="off" aria-label="Labour {i + 1} minutes" placeholder="0" bind:value={x.text} />
+            <span aria-hidden="true">min</span>
+          </div>
+          <button type="button" class="step plain" aria-label="Remove labour {i + 1}" onclick={() => labour.splice(i, 1)}><Icon name="close" size={18} /></button>
+        </div>
+      {/each}
+    </section>
+{/snippet}
 
 {#snippet rowsEditor(rows: Row[], isOut: boolean)}
   {#each rows as r, i (i)}
@@ -172,6 +238,15 @@
           </div>
         {/each}
       </section>
+      {#if editing}
+        {@render costEditors()}
+        {#if tried && costs.errors.length}<p class="error">{costs.errors[0]}</p>{/if}
+        <p class="hint">Saved transforms keep their costs; the new values apply from the next transform.</p>
+        <div class="edit-actions">
+          <button type="button" class="btn" onclick={() => (editing = false)}>Cancel</button>
+          <button type="button" class="btn btn-primary" onclick={saveEdit}>Save</button>
+        </div>
+      {:else}
       {#if recipe.extras.length}
         <section class="group">
           <h3>Default extras</h3>
@@ -184,8 +259,10 @@
           {#each recipe.labour as x (x.levelId)}<div class="row-between"><span>{levelName(x.levelId)}</span><b>{x.minutes} min</b></div>{/each}
         </section>
       {/if}
-      <p class="hint">Recipes can't be changed. For a different transform, create a new recipe.</p>
-      {#if !recipe.archived}
+      {#if !recipe.archived}<button type="button" class="btn btn-block" onclick={startEdit}>Edit time and costs</button>{/if}
+      <p class="hint">What it uses and makes can't be changed; for that, create a new recipe.</p>
+      {/if}
+      {#if !recipe.archived && !editing}
         <button type="button" class="btn btn-danger btn-block" onclick={() => (archiving = true)}>Archive recipe</button>
       {/if}
     </div>
@@ -213,40 +290,7 @@
       {@render rowsEditor(outputs, true)}
     </section>
 
-    <section class="group">
-      <div class="section-head">
-        <h3>Default extras <span class="muted">(optional)</span></h3>
-        <button type="button" class="btn-ghost link" onclick={() => extras.push({ label: '', text: '' })}>+ Add extra</button>
-      </div>
-      {#each extras as x, i (i)}
-        <div class="extra">
-          <input class="input" aria-label="Extra {i + 1} label" placeholder="Label" bind:value={x.label} />
-          <input class="input" inputmode="decimal" aria-label="Extra {i + 1} amount in euros" placeholder="€" bind:value={x.text} />
-          <button type="button" class="step plain" aria-label="Remove extra {i + 1}" onclick={() => extras.splice(i, 1)}><Icon name="close" size={18} /></button>
-        </div>
-      {/each}
-    </section>
-
-    <section class="group">
-      <div class="section-head">
-        <h3>Labour <span class="muted">(optional)</span></h3>
-        <button type="button" class="btn-ghost link" disabled={labour.length >= MAX_ROWS || labour.length >= levels.length} onclick={() => labour.push({ levelId: '', text: '' })}>+ Add labour</button>
-      </div>
-      {#if !levels.length}<p class="hint">Add work levels in Settings.</p>{/if}
-      {#each labour as x, i (i)}
-        <div class="extra">
-          <select class="input" aria-label="Labour {i + 1} level" bind:value={x.levelId}>
-            <option value="" disabled>Level…</option>
-            {#each levels as l (l.id)}<option value={l.id} disabled={labour.some((y, j) => j !== i && y.levelId === l.id)}>{l.name}</option>{/each}
-          </select>
-          <div class="suffix">
-            <input class="input" inputmode="numeric" autocomplete="off" aria-label="Labour {i + 1} minutes" placeholder="0" bind:value={x.text} />
-            <span aria-hidden="true">min</span>
-          </div>
-          <button type="button" class="step plain" aria-label="Remove labour {i + 1}" onclick={() => labour.splice(i, 1)}><Icon name="close" size={18} /></button>
-        </div>
-      {/each}
-    </section>
+    {@render costEditors()}
 
     {#if outputs.length > 1}
       <section class="group">
@@ -280,6 +324,11 @@
 </ConfirmSheet>
 
 <style>
+  .edit-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
   .form {
     display: grid;
     gap: 14px;
