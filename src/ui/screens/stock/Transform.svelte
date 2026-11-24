@@ -100,7 +100,7 @@
     const c = view.classesById.get(classId);
     if (!c) return null;
     if (date >= today) return view.snapshot.get(classId)?.avgCost ?? null;
-    return averageCostAt(c, app.orders, app.stock, view.classesById, { date, createdAt: '~' });
+    return averageCostAt(c, app.orders, app.stock, view.classesById, { date, createdAt: '~' }, app.purchases);
   }
   const mat = $derived(materialsCost(ins.filter((x) => x.amount > 0), avgCostAt, view.classesById));
   const costResult = $derived(costsFromForm(form, mat, outs.filter((x) => x.amount > 0)));

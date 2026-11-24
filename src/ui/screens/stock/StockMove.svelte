@@ -5,7 +5,6 @@
   import Header from '../../components/Header.svelte';
   import Segmented from '../../components/Segmented.svelte';
   import { fullName } from '../../../core/groups.ts';
-  import { formatUnitCost, parseUnitCost } from '../../../core/money.ts';
   import { formatAmount, parseAmount } from '../../../core/quantity.ts';
   import { app, freshRecord, localDate, saveStockEvent, view } from '../../data.svelte.ts';
   import { go } from '../../router.svelte.ts';
@@ -22,7 +21,6 @@
   const cls = $derived(view.classesById.get(classId));
   let amountText = $state('');
   let date = $state(localDate());
-  let costText = $state('');
   let reason = $state('');
   let otherText = $state('');
   let note = $state('');
@@ -36,7 +34,6 @@
   const decimals = $derived(cls?.unit.decimals ?? 0);
   const unit = $derived(cls?.unit.name ?? '');
   const amount = $derived(amountText.trim() ? parseAmount(amountText, decimals) : null);
-  const unitCost = $derived(costText.trim() ? parseUnitCost(costText) : null);
   const stock = $derived(cls ? (view.snapshot.get(cls.id)?.stock ?? 0) : 0);
   const preview = $derived(movePreview(stock, type, amount));
   const storedReason = $derived(reasonValue(reason, otherText));
@@ -46,7 +43,6 @@
   const errors = $derived({
     cls: cls ? '' : 'Choose a product.',
     amount: amount === null ? `Enter an amount in ${unit || 'its unit'} greater than 0.` : '',
-    cost: type === 'add' && costText.trim() && unitCost === null ? 'Enter a cost in euros, e.g. 0,45.' : '',
     reason: type === 'remove' && !storedReason ? (reason === 'other' ? 'Describe the reason.' : 'Choose a reason.') : '',
     date: date ? '' : 'Choose a date.',
   });
@@ -68,7 +64,7 @@
       type,
       classId: cls.id,
       amount,
-      unitCost: type === 'add' ? unitCost : null,
+      unitCost: null,
       reason: type === 'remove' ? storedReason : '',
       note: note.trim(),
       voided: false,
@@ -115,6 +111,7 @@
         <button type="button" class="step" aria-label="More" onclick={() => step(1)}>+</button>
       </div>
       {#if tried && errors.amount}<p class="error">{errors.amount}</p>{/if}
+      {#if type === 'add'}<p class="hint">Bought it? <a href="#/purchases/new">Record a purchase in Expenses.</a></p>{/if}
     </div>
 
     {#if cls}
@@ -138,13 +135,6 @@
           <input class="input" aria-label="Other reason" placeholder="What happened?" bind:value={otherText} />
         {/if}
         {#if tried && errors.reason}<p class="error">{errors.reason}</p>{/if}
-      </div>
-    {:else}
-      <div class="field">
-        <label for="cost">Cost per {unit || 'unit'} (optional)</label>
-        <input id="cost" class="input" inputmode="decimal" autocomplete="off" placeholder="e.g. €0.45" bind:value={costText} />
-        {#if unitCost !== null}<p class="hint">{formatUnitCost(unitCost)} per {unit}</p>{/if}
-        {#if tried && errors.cost}<p class="error">{errors.cost}</p>{/if}
       </div>
     {/if}
 
