@@ -223,6 +223,16 @@ describe('demoRecords: catalogue and clients', () => {
     expect(products.some((p) => p.customFields.length > 0 && Object.keys(p.customValues).length > 0)).toBe(true);
   });
 
+  it('variants of one product hold the same goods: different gift boxes are separate products with their own cost', () => {
+    const snap = stockSnapshot(products, orders, stock, purchases);
+    const classic = named('Gifts - Christmas box');
+    const deluxe = named('Gifts - Deluxe gift box');
+    expect(classic.variants).toHaveLength(1);
+    expect(deluxe.variants).toHaveLength(1);
+    expect(snap.get(deluxe.id)!.avgCost).not.toBe(snap.get(classic.id)!.avgCost);
+    expect(transforms.some((t) => t.outputs.some((o) => o.classId === deluxe.id))).toBe(true);
+  });
+
   it('has an archived product and an archived variant that still appear in old orders', () => {
     const archived = products.filter((p) => p.archived);
     expect(archived.length).toBeGreaterThanOrEqual(1);

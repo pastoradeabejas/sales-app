@@ -150,7 +150,8 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
   const labels = packaging('Labels', 100);
   const butterPaper = packaging('Butter paper', 30);
   const kefirBottle = packaging('Kefir bottle', 20);
-  const xmasBox = product('Gifts', 'Christmas box', 'pcs', 0, 3, true, [['box', 'Box', 1, 2500, null], ['box2', 'Deluxe (honey + candle)', 1, 3600, null]]);
+  const xmasBox = product('Gifts', 'Christmas box', 'pcs', 0, 3, true, [['box', 'Flower + Rosemary honey', 1, 2500, null]]);
+  const deluxeBox = product('Gifts', 'Deluxe gift box', 'pcs', 0, 2, true, [['box2', 'Heather honey + candle', 1, 3600, null]]);
   const comb = product('Honeycomb', 'Honeycomb', 'kg', 3, 2000, true, [['comb', 'By weight', null, 3000, null]]);
   const pollen = product('Pollen', '250g Jar', 'jar', 0, 8, true, [['pol', '250 g', 1, 700, null]]);
   const rawMilk = product('Dairy/Milk', 'Raw milk', 'L', 0, 50, false);
@@ -220,7 +221,7 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
   maker(fill('h5', 'Heather', '500g', heatherBulk, emptyJar5, h5, 500, 2), 24);
   maker(fill('h1', 'Heather', '1kg', heatherBulk, emptyJar1, h1, 1000, 3), 12);
   maker(recipe('box', 'Christmas box', [[f5, 1], [r1, 1], [giftBox, 1]], [[xmasBox, 1]], [['Ribbon', 60]], [[L2, 5]]), 6);
-  const deluxe = recipe('deluxe', 'Deluxe gift box', [[h5, 1], [largeCandle, 1], [giftBox, 1]], [[xmasBox, 1]], [['Ribbon', 60]], [[L2, 6]]);
+  maker(recipe('deluxe', 'Deluxe gift box', [[h5, 1], [largeCandle, 1], [giftBox, 1]], [[deluxeBox, 1]], [['Ribbon', 60]], [[L2, 6]]), 4);
   const candleL = recipe('candle-l', 'Make large candle', [[beeswax, 250], [wick, 30], [labels, 1]], [[largeCandle, 1]], [['Electricity', 15]], [[L2, 20]]);
   maker(candleL, 10);
   maker(recipe('candle-s', 'Make small candle', [[beeswax, 90], [wick, 20], [labels, 1]], [[smallCandle, 1]], [['Electricity', 8]], [[L2, 8]]), 20);
@@ -404,10 +405,7 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
     const christmas = (month === 12 && Number(date.slice(8, 10)) <= 24) || (month === 11 && Number(date.slice(8, 10)) >= 15);
     if (gifts && christmas && r() < 0.6) picks.push(r() < 0.5 ? 'box' : 'box2');
     const id = `demo-order-${pad(orders.length + 1)}`;
-    const lines = picks.map((key, j) => {
-      if (key === 'box2') make(deluxe, 1); // made to order
-      return lineFor(key, ci, id, j);
-    });
+    const lines = picks.map((key, j) => lineFor(key, ci, id, j));
     const name = client.name === RENAMED.client && day > RENAMED.since ? RENAMED.oldName : client.name;
     const order: Order = {
       ...stamp(at(date, 10, 9 * n.order++)), id, date, clientId: client.id, clientName: name, lines,
