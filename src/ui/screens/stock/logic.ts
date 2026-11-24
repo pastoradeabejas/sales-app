@@ -4,7 +4,7 @@ import { formatUnitCost, parseMoney } from '../../../core/money.ts';
 import { fullName } from '../../../core/groups.ts';
 import { formatAmount } from '../../../core/quantity.ts';
 import { daysLeft, type Movement } from '../../../core/stock.ts';
-import type { ClassAmount, CostShare, Decimals, Id, Order, ProductClass, Scaled, StockEvent, TransformCosts } from '../../../core/types.ts';
+import type { ClassAmount, CostShare, Decimals, Id, LabourCost, Order, ProductClass, Scaled, StockEvent, TransformCosts } from '../../../core/types.ts';
 
 /** Stock before and after an add or remove; an add on negative stock starts from 0 (§4.3). */
 export function movePreview(stock: Scaled, type: 'add' | 'remove', amount: Scaled | null) {
@@ -88,6 +88,7 @@ export function costsFromForm(
   form: CostForm,
   mat: { materials: number; complete: boolean },
   outputs: ClassAmount[],
+  labour: LabourCost[] = [],
 ): { costs: TransformCosts | null; error: string } {
   if (!form.opened) return { costs: null, error: '' };
   const extras = [];
@@ -98,7 +99,7 @@ export function costsFromForm(
       if (amount === null) return { costs: null, error: 'Check the extra cost amounts.' };
       extras.push({ label: x.label.trim() || 'Other', amount });
     }
-    if (!extras.length && mat.materials === 0 && !mat.complete) return { costs: null, error: '' };
+    if (!extras.length && !labour.length && mat.materials === 0 && !mat.complete) return { costs: null, error: '' };
   }
   let enteredTotal: number | undefined;
   if (form.mode === 'total') {
@@ -113,7 +114,7 @@ export function costsFromForm(
     if (!s || !sharesValid(s)) return { costs: null, error: 'Shares must add up to 100%.' };
     shares = s;
   }
-  const costs = buildTransformCosts({ mode: form.mode, materials: mat.materials, materialsComplete: mat.complete, extras, enteredTotal, outputs, shares });
+  const costs = buildTransformCosts({ mode: form.mode, materials: mat.materials, materialsComplete: mat.complete, ...(labour.length ? { labour } : {}), extras, enteredTotal, outputs, shares });
   return { costs, error: '' };
 }
 

@@ -162,7 +162,7 @@
         {#if recipeId}<dt>Recipe</dt><dd>{app.recipes.find((r) => r.id === recipeId)?.name ?? 'Unknown'}</dd>{/if}
         {#if event.costs}
           <dt>Cost</dt>
-          <dd>{formatMoney(event.costs.total)} (materials {formatMoney(event.costs.materials)}{event.costs.materialsComplete ? '' : ', incomplete'})</dd>
+          <dd>{formatMoney(event.costs.total)} (materials {formatMoney(event.costs.materials)}{event.costs.materialsComplete ? '' : ', incomplete'}{event.costs.labour?.length ? `, labour ${formatMoney(event.costs.labour.reduce((t, l) => t + l.amount, 0))}` : ''})</dd>
         {/if}
       {:else}
         {@const c = view.classesById.get(event.classId)}
