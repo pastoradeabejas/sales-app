@@ -26,6 +26,7 @@ describe('parseRoute', () => {
     ['#/purchases/p1/edit', 'purchase-edit', { id: 'p1' }],
     ['#/suppliers', 'suppliers', {}],
     ['#/suppliers/s1', 'supplier', { id: 's1' }],
+    ['#/profit', 'profit', {}],
   ])('%s -> %s', (hash, name, params) => {
     expect(parseRoute(hash)).toEqual({ name, params });
   });
@@ -70,6 +71,7 @@ describe('tabOf', () => {
     ['purchase-edit', 'expenses'],
     ['suppliers', 'expenses'],
     ['supplier', 'expenses'],
+    ['profit', 'profit'],
   ] as const)('%s is in the %s tab', (name, tab) => {
     expect(tabOf(name)).toBe(tab);
   });
@@ -87,6 +89,7 @@ describe('tab sides', () => {
     expect(tabHref('expenses', { expenses: 'suppliers' })).toBe('#/suppliers');
     expect(tabHref('stock', { stock: 'clients' })).toBe('#/products');
     expect(tabHref('stock', { stock: 'stock' })).toBe('#/stock');
+    expect(tabHref('profit', {})).toBe('#/profit');
   });
 
   it('parses the stored sides and ignores bad input', () => {

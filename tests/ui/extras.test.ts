@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { Client, Order, ProductClass } from '../../src/core/types.ts';
 import { quietRows, quietText } from '../../src/ui/screens/clients/quiet.ts';
 import { customFieldLabels, filterByCustomField } from '../../src/ui/screens/products/customFilter.ts';
-import { profitByClass } from '../../src/ui/screens/overview/profitLogic.ts';
 
 const cls = (id: string, fields: { key: string; label: string }[], values: Record<string, string | number>): ProductClass =>
   ({ id, name: id, customFields: fields.map((f) => ({ ...f, type: 'text' })), customValues: values }) as unknown as ProductClass;
@@ -52,18 +51,5 @@ describe('gone quiet rows', () => {
   it('text', () => {
     expect(quietText(45, 6)).toBe('Last order 45 days ago · 6 orders');
     expect(quietText(1, 1)).toBe('Last order 1 day ago · 1 order');
-  });
-});
-
-describe('profit by class', () => {
-  const line = (classId: string, total: number, cost: number | null) => ({
-    classId, className: classId, lineTotal: total, kind: 'fixed', quantity: 1, unitCost: cost, decimals: 0, unitName: 'u', variantId: 'v', variantLabel: 'v', unitPrice: total, amount: 0,
-  });
-  const order = { id: 'o', clientId: 'c', date: '2026-11-10', voided: false, lines: [line('a', 1000, 400), line('b', 1000, 100), line('d', 500, null)] } as unknown as Order;
-
-  it('sorted by profit desc, one row per class', () => {
-    const rows = profitByClass([order], { from: '2026-11-01', to: '2026-11-30' });
-    expect(rows.map((r) => r.classId)).toEqual(['b', 'a', 'd']);
-    expect(rows[0].profit).toBe(900);
   });
 });

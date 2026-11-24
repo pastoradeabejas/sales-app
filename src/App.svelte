@@ -10,6 +10,7 @@
   import { isConfigured } from './store/settings.ts';
   import { startSync, sync } from './ui/sync.svelte.ts';
   import Settings from './ui/screens/Settings.svelte';
+  import Profit from './ui/screens/profit/Profit.svelte';
   import Overview from './ui/screens/overview/Overview.svelte';
   import Orders from './ui/screens/orders/Orders.svelte';
   import OrderForm from './ui/screens/orders/OrderForm.svelte';
@@ -55,6 +56,7 @@
     'purchase-edit': PurchaseForm,
     suppliers: Suppliers,
     supplier: SupplierDetail,
+    profit: Profit,
   };
 
   initData()

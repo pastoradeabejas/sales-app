@@ -10,7 +10,9 @@
     format,
     selected = null,
     onselect,
-  }: { points: ChartPoint[]; label: string; format: (v: number) => string; selected?: number | null; onselect?: (i: number) => void } = $props();
+    paidLabel = 'Paid',
+    unpaidLabel = 'Unpaid',
+  }: { points: ChartPoint[]; label: string; format: (v: number) => string; selected?: number | null; onselect?: (i: number) => void; paidLabel?: string; unpaidLabel?: string } = $props();
 
   const g = $derived(barGeometry(points));
   const total = $derived(points.reduce((s, p) => s + p.total, 0));
@@ -39,10 +41,10 @@
       {/each}
     </div>
   </div>
-  <ChartLegend />
+  <ChartLegend {paidLabel} {unpaidLabel} />
   <p class="tip" aria-live="polite">
     {#if picked}
-      <b>{picked.label}</b> · {format(picked.total)} · paid {format(picked.paid)} · unpaid {format(picked.unpaid)}
+      <b>{picked.label}</b> · {format(picked.total)} · {paidLabel.toLowerCase()} {format(picked.paid)} · {unpaidLabel.toLowerCase()} {format(picked.unpaid)}
     {:else}
       Tap a bar for details.
     {/if}
@@ -50,7 +52,7 @@
   <div class="visually-hidden">
     <table>
     <caption>{label}</caption>
-    <thead><tr><th>Period</th><th>Paid</th><th>Unpaid</th><th>Total</th></tr></thead>
+    <thead><tr><th>Period</th><th>{paidLabel}</th><th>{unpaidLabel}</th><th>Total</th></tr></thead>
     <tbody>
       {#each points as p (p.key)}
         <tr><td>{p.label}</td><td>{format(p.paid)}</td><td>{format(p.unpaid)}</td><td>{format(p.total)}</td></tr>

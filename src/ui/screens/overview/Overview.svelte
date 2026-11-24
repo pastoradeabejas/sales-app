@@ -15,7 +15,6 @@
   import { showToast } from '../../toast.svelte.ts';
   import { checkAppUpdate } from '../../update.ts';
   import OwedCard from './OwedCard.svelte';
-  import ProfitCard from './ProfitCard.svelte';
   import SyncBadge from './SyncBadge.svelte';
   import UnitsSold from './UnitsSold.svelte';
   import { stockLine } from './stockLine.ts';
@@ -159,7 +158,9 @@
     <div class="card"><span class="muted">Spent {rangeNoun}</span><span class="big">{formatMoney(spent)}</span></div>
   </section>
 
-  <ProfitCard {range} />
+  <section class="card">
+    <a class="list-row" href="#/profit"><span class="grow title">Profit, margins and costs</span><span class="muted">Profit tab</span><Icon name="chevron" size={18} /></a>
+  </section>
 </div>
 
 <style>
