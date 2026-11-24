@@ -240,14 +240,14 @@
     <button type="button" class="btn view-btn" aria-label={viewMode === 'table' ? 'Card view' : 'Table view'} onclick={switchView}>
       <Icon name={viewMode === 'table' ? 'cards' : 'table'} />
     </button>
-    <a class="btn btn-primary" href="#/products/new">+ New class</a>
+    <a class="btn btn-primary" href="#/products/new">+ New product</a>
   {/snippet}
 </Header>
 
 <div class="page">
   {#if app.products.length === 0}
     <EmptyState title="Start by adding your first product">
-      <a class="btn btn-primary" href="#/products/new">+ New class</a>
+      <a class="btn btn-primary" href="#/products/new">+ New product</a>
     </EmptyState>
   {/if}
 

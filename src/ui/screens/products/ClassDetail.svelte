@@ -40,6 +40,7 @@
     ? newClassDraft()
     : ($state.snapshot(view.classesById.get(classId as string) ?? newClassDraft()) as ProductClass);
   let name = $state(initial.name);
+  let groupsOpen = $state(false);
   let groupText = $state(isNew ? normalizeGroup(untrack(() => query.group)) : normalizeGroup(initial.group));
   let unitName = $state(initial.unit.name);
   let decimals = $state(String(initial.unit.decimals) as '0' | '1' | '2' | '3');
@@ -176,7 +177,7 @@
   }
 </script>
 
-<Header title={isNew ? 'New class' : stored ? fullName(stored) : 'Product'} back="#/products" />
+<Header title={isNew ? 'New product' : stored ? fullName(stored) : 'Product'} back="#/products" />
 
 <div class="page">
   {#if missing}
@@ -197,10 +198,28 @@
 
       <div class="field">
         <label for="c-group">Group</label>
-        <input id="c-group" class="input" list="group-suggestions" bind:value={groupText} maxlength="120" autocomplete="off" placeholder="Top level" />
-        <datalist id="group-suggestions">
-          {#each groups as g (g)}<option value={g}></option>{/each}
-        </datalist>
+        <div class="picker">
+          <input id="c-group" class="input" bind:value={groupText} maxlength="120" autocomplete="off" placeholder="Top level" />
+          <button type="button" class="picker-btn" aria-label="Choose a group" aria-expanded={groupsOpen} onclick={() => (groupsOpen = !groupsOpen)}>
+            <Icon name={groupsOpen ? 'up' : 'down'} size={20} />
+          </button>
+        </div>
+        {#if groupsOpen}
+          <div class="picker-list" role="listbox" aria-label="Groups">
+            {#each ['', ...groups] as g (g)}
+              <button
+                type="button"
+                role="option"
+                aria-selected={normalizeGroup(groupText) === g}
+                style:padding-left="{12 + (g ? g.split('/').length - 1 : 0) * 16}px"
+                onclick={() => {
+                  groupText = g;
+                  groupsOpen = false;
+                }}>{g ? g.split('/').at(-1) : 'Top level'}</button
+              >
+            {/each}
+          </div>
+        {/if}
         <p class="hint">Use / for subgroups, e.g. Honey/Rosemary</p>
       </div>
 
@@ -446,6 +465,46 @@
 </div>
 
 <style>
+  .picker {
+    position: relative;
+  }
+  .picker input {
+    padding-right: var(--tap);
+  }
+  .picker-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: var(--tap);
+    display: grid;
+    place-items: center;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .picker-list {
+    display: grid;
+    max-height: 260px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--surface);
+  }
+  .picker-list button {
+    min-height: var(--tap);
+    padding-right: 12px;
+    border: 0;
+    border-bottom: 1px solid var(--divider);
+    background: none;
+    text-align: left;
+    cursor: pointer;
+  }
+  .picker-list button[aria-selected='true'] {
+    color: var(--accent);
+    font-weight: 600;
+  }
   .form {
     display: grid;
     gap: 16px;
