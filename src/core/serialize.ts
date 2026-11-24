@@ -7,7 +7,7 @@ const withStamps = (...keys: string[]) => [...BASE, ...keys, ...STAMPS];
 
 // Top-level key order per record type (field order of the §3 examples).
 const TOP: Record<RecordType, string[]> = {
-  product: withStamps('name', 'unit', 'lowStockThreshold', 'trackStock', 'sellable', 'customFields', 'customValues', 'notes', 'archived', 'variants'),
+  product: withStamps('name', 'group', 'unit', 'lowStockThreshold', 'trackStock', 'sellable', 'customFields', 'customValues', 'notes', 'archived', 'variants'),
   client: withStamps('name', 'phone', 'notes', 'tags', 'archived'),
   order: withStamps('date', 'clientId', 'clientName', 'lines', 'total', 'note', 'voided', 'voidReason'),
   payment: withStamps('date', 'clientId', 'orderId', 'amount', 'method', 'note', 'voided'),

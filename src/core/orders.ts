@@ -1,4 +1,5 @@
 import { roundCost, roundHalfUp } from './money.ts';
+import { fullName } from './groups.ts';
 import { formatAmount } from './quantity.ts';
 import type { Cents, IsoDate, Order, OrderLine, ProductClass, Scaled, UnitCost, Variant } from './types.ts';
 
@@ -37,7 +38,7 @@ export function buildLine(
     lineId,
     classId: cls.id,
     variantId: variant.id,
-    className: cls.name,
+    className: fullName(cls),
     variantLabel: variant.label,
     kind: variant.kind,
     unitName: cls.unit.name,
