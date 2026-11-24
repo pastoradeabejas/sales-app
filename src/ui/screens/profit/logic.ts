@@ -59,3 +59,23 @@ export function tickMoney(cents: number): string {
   const body = e >= 1000 ? `${Number((e / 1000).toFixed(1))}k` : String(Number(e.toFixed(2)));
   return `${cents < 0 ? '−' : ''}€${body}`;
 }
+
+export type SortKey = 'name' | 'sales' | 'profit' | 'margin';
+export interface Sort { key: SortKey; dir: 'asc' | 'desc' }
+type Sortable = { name: string; sales: number; profit: number; margin: number | null };
+
+/** A sorted copy; names A-Z ignore case and accents, an unknown margin is always last. */
+export function sortRows<T extends Sortable>(rows: T[], s: Sort): T[] {
+  const sign = s.dir === 'asc' ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    if (s.key === 'name') return sign * a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true });
+    const x = a[s.key];
+    const y = b[s.key];
+    if (x === null || y === null) return x === y ? 0 : x === null ? 1 : -1;
+    return sign * (x - y);
+  });
+}
+
+/** Tapping a column header: the sorted column flips, another starts high to low (names A-Z). */
+export const nextSort = (cur: Sort, key: SortKey): Sort =>
+  cur.key === key ? { key, dir: cur.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: key === 'name' ? 'asc' : 'desc' };

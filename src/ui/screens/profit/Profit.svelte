@@ -7,8 +7,10 @@
   import EmptyState from '../../components/EmptyState.svelte';
   import Header from '../../components/Header.svelte';
   import Segmented from '../../components/Segmented.svelte';
+  import SortHead from '../../components/SortHead.svelte';
+  import { liveName } from '../stock/grouping.ts';
   import { app, localDate, view } from '../../data.svelte.ts';
-  import { changeText, changeTone, marginText, pointsChange, monthLabel, profitRange, shareText, topRows, trendPoints } from './logic.ts';
+  import { changeText, changeTone, marginText, pointsChange, monthLabel, profitRange, shareText, sortRows, topRows, trendPoints, type Sort } from './logic.ts';
 
   let {}: { params?: Record<string, string>; query?: Record<string, string> } = $props();
 
@@ -39,8 +41,17 @@
   ]);
 
   const byItem = $derived(expensesByItem(app.purchases, view.classesById, range));
-  const byProduct = $derived(profitByProduct(app.orders, range));
-  const byClient = $derived(profitByClient(app.orders, range));
+  // Full product names ("Honey - Rosemary - 500g Jar") and current client names; tables sort by a tapped column.
+  let productSort = $state<Sort>({ key: 'sales', dir: 'desc' });
+  let clientSort = $state<Sort>({ key: 'sales', dir: 'desc' });
+  const byProduct = $derived(sortRows(profitByProduct(app.orders, range).map((r) => ({ ...r, name: liveName(view.classesById, r.classId, r.className) })), productSort));
+  const byClient = $derived(sortRows(profitByClient(app.orders, range).map((r) => ({ ...r, name: view.clientsById.get(r.clientId)?.name ?? r.clientName })), clientSort));
+  const cols = (first: string) => [
+    { key: 'name' as const, label: first },
+    { key: 'sales' as const, label: 'Sales' },
+    { key: 'profit' as const, label: 'Profit' },
+    { key: 'margin' as const, label: 'Margin' },
+  ];
   const inventory = $derived(inventoryValue(app.products, view.snapshot));
   const trend = $derived(monthlyTrend(app.orders, app.purchases, app.stock, view.classesById, today));
   const points = $derived(trendPoints(trend));
@@ -140,7 +151,7 @@
       <table class="booktabs">
         <tbody>
           {#each topRows(inventory.rows, showClasses) as r (r.classId)}
-            <tr><td>{r.name}</td><td class="num">{formatMoney(r.value)}</td></tr>
+            <tr><td>{liveName(view.classesById, r.classId, r.name)}</td><td class="num">{formatMoney(r.value)}</td></tr>
           {/each}
         </tbody>
       </table>
@@ -158,10 +169,10 @@
         <p class="muted">No sales in this period.</p>
       {:else}
         <table class="booktabs grid">
-          <thead><tr><th>Product</th><th>Sales</th><th>Profit</th><th>Margin</th></tr></thead>
+          <SortHead cols={cols('Product')} bind:sort={productSort} />
           <tbody>
             {#each topRows(byProduct, showProducts) as r (r.classId)}
-              <tr><td>{view.classesById.get(r.classId)?.name ?? r.className}</td><td class="num">{formatMoney(r.sales)}</td><td class="num">{formatMoney(r.profit)}</td><td class="num">{marginText(r.margin)}</td></tr>
+              <tr><td>{r.name}</td><td class="num">{formatMoney(r.sales)}</td><td class="num">{formatMoney(r.profit)}</td><td class="num">{marginText(r.margin)}</td></tr>
             {/each}
           </tbody>
         </table>
@@ -177,10 +188,10 @@
         <p class="muted">No sales in this period.</p>
       {:else}
         <table class="booktabs grid">
-          <thead><tr><th>Client</th><th>Sales</th><th>Profit</th><th>Margin</th></tr></thead>
+          <SortHead cols={cols('Client')} bind:sort={clientSort} />
           <tbody>
             {#each topRows(byClient, showClients) as r (r.clientId)}
-              <tr><td>{view.clientsById.get(r.clientId)?.name ?? r.clientName}</td><td class="num">{formatMoney(r.sales)}</td><td class="num">{formatMoney(r.profit)}</td><td class="num">{marginText(r.margin)}</td></tr>
+              <tr><td>{r.name}</td><td class="num">{formatMoney(r.sales)}</td><td class="num">{formatMoney(r.profit)}</td><td class="num">{marginText(r.margin)}</td></tr>
             {/each}
           </tbody>
         </table>
@@ -194,7 +205,7 @@
       <h2>Expenses by item</h2>
       {#each byItem as e (e.classId)}
         <div class="exp">
-          <span class="ellipsis">{e.name}</span>
+          <span class="ellipsis">{liveName(view.classesById, e.classId, e.name)}</span>
           <span class="num">{formatMoney(e.amount)}</span>
           <span class="num muted">{shareText(e.share)}</span>
           <span class="bar"><i style:width="{Math.round(e.share * 100)}%"></i></span>
@@ -277,13 +288,14 @@
     border-top: 2px solid var(--ink);
     border-bottom: 2px solid var(--ink);
   }
-  .booktabs th {
+  /* Header cells may come from SortHead, hence :global. */
+  .booktabs :global(th) {
     padding: 8px 4px 6px;
     text-align: right;
     font-weight: 700;
     border-bottom: 1px solid var(--ink);
   }
-  .booktabs th:first-child {
+  .booktabs :global(th:first-child) {
     text-align: left;
   }
   .booktabs td {
@@ -305,8 +317,13 @@
     width: 7.5em;
   }
   .grid td:first-child,
-  .grid th:first-child {
-    width: 30%;
+  .grid :global(th:first-child) {
+    width: 34%;
+  }
+  /* Full product names ("Honey - Rosemary - 500g Jar") wrap rather than lose their end. */
+  .grid td:first-child {
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
   .total td {
     font-weight: 700;

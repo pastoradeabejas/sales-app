@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { changeText, changeTone, marginText, monthLabel, pointsChange, profitRange, shareText, tickMoney, topRows, trendPoints } from '../../src/ui/screens/profit/logic.ts';
+import { changeText, changeTone, marginText, monthLabel, pointsChange, profitRange, shareText, sortRows, nextSort, tickMoney, topRows, trendPoints } from '../../src/ui/screens/profit/logic.ts';
 
 describe('profit formatting', () => {
   it('formats the change vs the previous period', () => {
@@ -82,5 +82,31 @@ describe('tickMoney', () => {
     expect(tickMoney(50000)).toBe('€500');
     expect(tickMoney(250)).toBe('€2.5');
     expect(tickMoney(0)).toBe('€0');
+  });
+});
+
+describe('table sorting', () => {
+  const rows = [
+    { name: 'Butter', sales: 120, profit: 55, margin: 0.458 },
+    { name: 'eggs', sales: 71, profit: 19, margin: null },
+    { name: 'Kefir', sales: 58, profit: 33, margin: 0.571 },
+  ];
+  const names = (xs: typeof rows) => xs.map((r) => r.name);
+  it('sorts by a number either way; an unknown margin always goes last', () => {
+    expect(names(sortRows(rows, { key: 'profit', dir: 'desc' }))).toEqual(['Butter', 'Kefir', 'eggs']);
+    expect(names(sortRows(rows, { key: 'margin', dir: 'desc' }))).toEqual(['Kefir', 'Butter', 'eggs']);
+    expect(names(sortRows(rows, { key: 'margin', dir: 'asc' }))).toEqual(['Butter', 'Kefir', 'eggs']);
+  });
+  it('sorts by name, case-insensitive', () => {
+    expect(names(sortRows(rows, { key: 'name', dir: 'asc' }))).toEqual(['Butter', 'eggs', 'Kefir']);
+  });
+  it('does not change the input', () => {
+    sortRows(rows, { key: 'sales', dir: 'asc' });
+    expect(names(rows)).toEqual(['Butter', 'eggs', 'Kefir']);
+  });
+  it('tapping the sorted column flips it; another column starts high-to-low (names A-Z)', () => {
+    expect(nextSort({ key: 'sales', dir: 'desc' }, 'sales')).toEqual({ key: 'sales', dir: 'asc' });
+    expect(nextSort({ key: 'sales', dir: 'asc' }, 'margin')).toEqual({ key: 'margin', dir: 'desc' });
+    expect(nextSort({ key: 'sales', dir: 'desc' }, 'name')).toEqual({ key: 'name', dir: 'asc' });
   });
 });
