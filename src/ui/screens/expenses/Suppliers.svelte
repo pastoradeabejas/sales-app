@@ -42,7 +42,7 @@
             <span class="title">{r.supplier.name}{r.supplier.archived ? ' (archived)' : ''}</span>
             <span class="muted">{r.last ? `Last purchase ${shortDate(r.last)}` : 'No purchases yet'}</span>
           </span>
-          <span class="amount">{formatMoney(r.spentYear)}<span class="muted"> this year</span></span>
+          <span class="money"><span class="amount">{formatMoney(r.spentYear)}</span><span class="muted per">this year</span></span>
         </a>
       {/each}
     </div>
@@ -52,6 +52,13 @@
 <SupplierSheet bind:open={adding} />
 
 <style>
+  .money {
+    display: grid;
+    justify-items: end;
+  }
+  .per {
+    font-size: var(--fs-small);
+  }
   .toggle {
     display: flex;
     align-items: center;

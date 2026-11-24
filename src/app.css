@@ -121,6 +121,8 @@ button {
 /* Shared building blocks used by every screen. */
 .page {
   display: grid;
+  /* minmax(0) keeps long one-line texts from widening the page */
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   padding: 4px 16px 0;
 }

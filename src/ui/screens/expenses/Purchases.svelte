@@ -22,11 +22,7 @@
   };
 </script>
 
-<Header title="Expenses">
-  {#snippet actions()}
-    <a class="btn btn-primary" href="#/purchases/new">+ New purchase</a>
-  {/snippet}
-</Header>
+<Header title="Expenses" />
 <TabSwitch side="purchases" />
 <div class="page">
   <p class="month">Spent in {monthName(today)} <strong>{formatMoney(spentIn(app.purchases, today.slice(0, 7)))}</strong></p>
@@ -73,6 +69,7 @@
   }
   .day {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 6px;
   }
   .day h2 {
