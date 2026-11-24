@@ -1,8 +1,9 @@
 // Demo mode sample data (spec §2.1, §15): deterministic records relative to `today`, loaded without outbox.
+import { buildTransformCosts, labourCosts } from '../core/costs.ts';
 import {
   SCHEMA_VERSION,
   type Client, type Decimals, type IsoDate, type Order, type OrderLine, type Payment, type PaymentMethod,
-  type ProductClass, type Recipe, type RecordType, type StockEvent, type Timestamp, type Variant,
+  type ProductClass, type Purchase, type PurchaseLine, type Recipe, type RecordType, type StockEvent, type Supplier, type Timestamp, type LabourRow, type Variant, type WorkLevel,
 } from '../core/types.ts';
 import type { Store } from './store.ts';
 
@@ -101,10 +102,23 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
     ['mbf', 'By weight', null, 1300, 850], ['mb5', '500 g pack', 500, 700, 430],
   ]);
   const steak = product(25, 'Meat/Beef', 'Steak', 'kg', 3, 1000, true, [['stk', 'By weight', null, 2600, 1700]]);
+  const expense = (n: number, name: string): ProductClass => ({
+    ...product(n, 'Expenses', name, 'pcs', 0, null, false, []), trackStock: false,
+  });
+  const fuel = expense(26, 'Fuel');
+  const marketFee = expense(27, 'Market fee');
+  const hiveTreatment = expense(28, 'Hive treatment');
   const products = [
     flowerBulk, f5, f1, rosemaryBulk, r5, r1, oakBulk, o5, o1, emptyJar5, emptyJar1, lid, giftBox, xmasBox, comb, pollen,
-    rawMilk, bottle, curedCheese, freshCheese, yogurt, chorizo, porkLoin, minced, steak,
+    rawMilk, bottle, curedCheese, freshCheese, yogurt, chorizo, porkLoin, minced, steak, fuel, marketFee, hiveTreatment,
   ];
+
+  const supplier = (n: number, name: string): Supplier => ({ ...base, id: `demo-supplier-${n}`, name, phone: '', notes: '', archived: false });
+  const [envases, apicola, gasolinera] = [supplier(1, 'Envases Levante'), supplier(2, 'Apícola Sur'), supplier(3, 'Gasolinera')];
+  const levels: WorkLevel[] = [['Level 1', 1200], ['Level 2', 1450], ['Level 3', 1800]].map(([name, hourlyRate], i) => ({
+    ...base, id: `demo-level-${i + 1}`, name: name as string, hourlyRate: hourlyRate as number, archived: false,
+  }));
+  const levelsById = new Map(levels.map((l) => [l.id, l]));
 
   const clients: Client[] = CLIENTS.map(([name, phone, tags]) => ({
     ...base, id: `demo-client-${name === 'Lucía' ? 'lucia' : name.toLowerCase()}`, name, phone, notes: '', tags, archived: false,
@@ -160,12 +174,27 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
     unitCost.set(cls.id, cost);
     stock.push(event(days, { type: 'add', classId: cls.id, amount, unitCost: cost, reason: '' }));
   };
+  // Purchases are always paid at once; a tracked line feeds the class average cost like an add with a unit cost.
+  const purchases: Purchase[] = [];
+  const buy = (days: number, from: Supplier | null, lines: [ProductClass, number, number][]) => {
+    const rows = lines.map(([cls, amount, cost], j): PurchaseLine => {
+      if (cls.trackStock) unitCost.set(cls.id, cost);
+      return {
+        lineId: `demo-purchase-${purchases.length + 1}-l${j + 1}`, classId: cls.id, className: cls.group ? `${cls.group}/${cls.name}` : cls.name,
+        unitName: cls.unit.name, decimals: cls.unit.decimals, amount, lineTotal: roundDiv(amount * cost, 10 ** cls.unit.decimals),
+      };
+    });
+    purchases.push({
+      ...base, id: `demo-purchase-${purchases.length + 1}`, date: ago(days), supplierId: from?.id ?? null, supplierName: from?.name ?? '',
+      lines: rows, total: rows.reduce((t, l) => t + l.lineTotal, 0), method: methods[purchases.length % methods.length], note: '', voided: false,
+    });
+  };
   const recipes: Recipe[] = [];
-  const recipe = (key: string, name: string, inputs: [ProductClass, number][], out: ProductClass, extras: [string, number][], outAmount = 1) => {
+  const recipe = (key: string, name: string, inputs: [ProductClass, number][], out: ProductClass, extras: [string, number][], outAmount = 1, labour?: LabourRow[]) => {
     const r: Recipe = {
       ...base, id: `demo-recipe-${key}`, name, inputs: inputs.map(([c, amount]) => ({ classId: c.id, amount })),
       outputs: [{ classId: out.id, amount: outAmount }], extras: extras.map(([label, amount]) => ({ label, amount })),
-      shares: [{ classId: out.id, share: 1 }], archived: false,
+      shares: [{ classId: out.id, share: 1 }], ...(labour ? { labour } : {}), archived: false,
     };
     recipes.push(r);
     return r;
@@ -176,16 +205,15 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
     const decimals = (id: string) => products.find((p) => p.id === id)!.unit.decimals;
     const materials = Math.round(inputs.reduce((s, i) => s + (i.amount / 10 ** decimals(i.classId)) * unitCost.get(i.classId)!, 0));
     const extras = r.extras.map((e) => ({ ...e, amount: e.amount * times }));
+    const outputs = r.outputs.map((o) => ({ ...o, amount: o.amount * times }));
+    const labour = r.labour && labourCosts(r.labour.map((l) => ({ ...l, minutes: l.minutes * times })), levelsById);
     stock.push(event(days, {
-      type: 'transform', inputs, outputs: r.outputs.map((o) => ({ ...o, amount: o.amount * times })), recipeId: r.id,
-      costs: {
-        mode: 'breakdown', materials, materialsComplete: true, extras,
-        total: materials + extras.reduce((s, e) => s + e.amount, 0), allocation: r.shares,
-      },
+      type: 'transform', inputs, outputs, recipeId: r.id,
+      costs: buildTransformCosts({ mode: 'breakdown', materials, materialsComplete: true, labour, extras, outputs, shares: r.shares }),
     }));
   };
   const fill = (key: string, honey: string, size: string, bulkCls: ProductClass, empty: ProductClass, out: ProductClass, kg: number, time: number) =>
-    recipe(key, `Fill ${honey} ${size}`, [[empty, 1], [lid, 1], [bulkCls, kg]], out, [['Labels', 10], ['Time', time]]);
+    recipe(key, `Fill ${honey} ${size}`, [[empty, 1], [lid, 1], [bulkCls, kg]], out, [['Labels', 10], ['Time', time]], 1, [{ levelId: 'demo-level-1', minutes: time }]);
   const fillF5 = fill('f5', 'Flower', '500g', flowerBulk, emptyJar5, f5, 500, 40);
   const fillF1 = fill('f1', 'Flower', '1kg', flowerBulk, emptyJar1, f1, 1000, 60);
   const fillR5 = fill('r5', 'Rosemary', '500g', rosemaryBulk, emptyJar5, r5, 500, 40);
@@ -194,14 +222,14 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
   const fillO1 = fill('o1', 'Oak', '1kg', oakBulk, emptyJar1, o1, 1000, 60);
   const boxRecipe = recipe('box', 'Christmas box', [[f5, 1], [r1, 1], [giftBox, 1]], xmasBox, [['Time', 100]]);
 
-  add(125, flowerBulk, 60000, 650); add(125, rosemaryBulk, 40000, 800); add(125, oakBulk, 25000, 900);
-  add(125, emptyJar5, 200, 35); add(125, emptyJar1, 120, 50); add(125, lid, 320, 12); add(125, giftBox, 20, 150);
+  buy(125, apicola, [[flowerBulk, 60000, 650], [rosemaryBulk, 40000, 800], [oakBulk, 25000, 900]]);
+  buy(125, envases, [[emptyJar5, 200, 35], [emptyJar1, 120, 50], [lid, 320, 12], [giftBox, 20, 150]]);
   add(125, pollen, 48, 250); add(125, comb, 14000, 2000);
   make(122, fillF5, 40); make(122, fillF1, 20);
   make(121, fillR5, 30); make(121, fillR1, 25);
   make(100, fillO5, 20); make(100, fillO1, 10);
-  add(80, rosemaryBulk, 10000, 820);
-  add(75, flowerBulk, 20000, 680);
+  buy(80, apicola, [[rosemaryBulk, 10000, 820]]);
+  buy(75, apicola, [[flowerBulk, 20000, 680]]);
   make(65, fillF5, 30);
   stock.push(event(60, { type: 'remove', classId: f5.id, amount: 3, unitCost: null, reason: 'broken' }));
   make(55, fillR5, 16);
@@ -219,10 +247,16 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
   make(58, bottleRecipe, 40); make(57, freshRecipe, 20); make(56, yogurtRecipe, 10);
   add(40, steak, 8000, 1700);
 
+  // Running costs over the demo months: fuel twice a month, a weekly market fee, one hive treatment.
+  for (let d = 115; d >= 10; d -= 15) buy(d, gasolinera, [[fuel, 1, 4000]]);
+  for (let d = 119; d >= 0; d -= 7) buy(d, null, [[marketFee, 1, 2500]]);
+  buy(90, null, [[hiveTreatment, 1, 6000]]);
+
   const as = (type: RecordType, records: object[]) => records.map((record) => ({ type, record }));
   return [
     ...as('product', products), ...as('client', clients), ...as('order', orders),
     ...as('payment', payments), ...as('stock', stock), ...as('recipe', recipes),
+    ...as('supplier', [envases, apicola, gasolinera]), ...as('level', levels), ...as('purchase', purchases),
   ];
 }
 

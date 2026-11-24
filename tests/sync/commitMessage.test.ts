@@ -36,6 +36,17 @@ describe('commitMessage (§6.2)', () => {
     expect(await commitMessage('Mac', entry('stock', { ...tr, voided: true }), lookup)).toBe('[Mac] transform void: Milk −500 kg → Yogurt +10,000 pcs');
   });
 
+  it('formats purchases, suppliers and work levels (§16.8)', async () => {
+    const p = {
+      supplierName: 'Envases Levante', total: 13500, voided: false,
+      lines: [{ className: 'Packaging/Lid', amount: 900, decimals: 0, unitName: 'pcs', lineTotal: 13500 }],
+    };
+    expect(await commitMessage('Phone A', entry('purchase', p), lookup)).toBe('[Phone A] purchase: Envases Levante, Packaging/Lid +900 pcs (€135.00)');
+    expect(await commitMessage('Mac', entry('purchase', { ...p, supplierName: '', voided: true }), lookup)).toBe('[Mac] purchase void: No supplier, Packaging/Lid +900 pcs (€135.00)');
+    expect(await commitMessage('Mac', entry('supplier', { name: 'Envases Levante' }), lookup)).toBe('[Mac] supplier: Envases Levante');
+    expect(await commitMessage('Mac', entry('level', { name: 'Level 2', hourlyRate: 1450 }), lookup)).toBe('[Mac] level: Level 2 €14.50/h');
+  });
+
   it('formats products, clients and recipes by name', async () => {
     expect(await commitMessage('Mac', entry('product', { name: 'Parmigiano Reggiano' }), lookup)).toBe('[Mac] product: Parmigiano Reggiano');
     expect(await commitMessage('Mac', entry('client', { name: 'Marta' }), lookup)).toBe('[Mac] client: Marta');

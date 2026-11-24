@@ -48,6 +48,19 @@ describe('store: records', () => {
     expect('classIds' in (outbox[0].content as object)).toBe(false);
   });
 
+  it('finds purchases by line classIds without leaking the index field', async () => {
+    const { store } = setup();
+    const p = {
+      id: 'p1', date: '2026-11-22', supplierId: null, supplierName: '', total: 300, method: 'cash', note: '', voided: false,
+      lines: [{ classId: 'lid', amount: 1, lineTotal: 100, decimals: 0 }, { classId: 'lid', amount: 2, lineTotal: 200, decimals: 0 }],
+    };
+    await store.save('purchase', p, 'purchases/2026/11/p1.json');
+    const found = await store.byIndex('purchases', 'classIds', 'lid');
+    expect(found.map((r) => (r as { id: string }).id)).toEqual(['p1']);
+    expect('classIds' in (found[0] as object)).toBe(false);
+    expect('classIds' in ((await store.outbox())[0].content as object)).toBe(false);
+  });
+
   it('needs a path for a record it has never seen', async () => {
     const { store } = setup();
     await expect(store.save('client', marta)).rejects.toThrow();

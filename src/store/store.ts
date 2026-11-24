@@ -59,9 +59,10 @@ export type Store = ReturnType<typeof createStore>;
 const ALL: TableName[] = ['products', 'clients', 'orders', 'payments', 'stock', 'recipes', 'files', 'outbox', 'meta'];
 const unique = <T>(xs: T[]) => [...new Set(xs)];
 
-// Transforms get a derived `classIds` field so the multi-entry index can find them; it never leaves the store.
+// Transforms and purchases get a derived `classIds` field so the multi-entry index can find them; it never leaves the store.
 type Row = Record<string, unknown>;
 function toRow(store: StoreName, rec: Row): Row {
+  if (store === 'purchases') return { ...rec, classIds: unique((rec.lines as { classId: Id }[]).map((l) => l.classId)) };
   if (store !== 'stock' || rec.type !== 'transform') return rec;
   const sides = [...(rec.inputs as { classId: Id }[]), ...(rec.outputs as { classId: Id }[])];
   return { ...rec, classIds: unique(sides.map((s) => s.classId)) };
