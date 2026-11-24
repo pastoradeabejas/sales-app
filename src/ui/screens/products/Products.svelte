@@ -9,6 +9,7 @@
   import { go } from '../../router.svelte.ts';
   import { showToast } from '../../toast.svelte.ts';
   import { formatAmount } from '../../../core/quantity.ts';
+  import { formatMoney } from '../../../core/money.ts';
   import { isExpenseItem } from '../../../core/purchases.ts';
   import { isLowStock } from '../../../core/stock.ts';
   import { rangeFor, unitsSold, type ClassSold } from '../../../core/stats.ts';
@@ -16,7 +17,7 @@
   import type { ProductClass } from '../../../core/types.ts';
   import CustomFilter from './CustomFilter.svelte';
   import { filterByCustomField } from './customFilter.ts';
-  import { costLabel, priceLabel, sideClasses, sortClasses, sortedVariants, type ClassSide } from './logic.ts';
+  import { costLabel, expenseFigures, priceLabel, sideClasses, sortClasses, sortedVariants, type ClassSide } from './logic.ts';
   import { COLLAPSED_KEY, VIEW_KEY, parseCollapsed, parseView, productTree, renameConflicts, toggleCollapsed } from './tree.ts';
   import { flattenTree } from '../stock/grouping.ts';
 
@@ -28,8 +29,9 @@
   let fieldKey = $state('');
   let fieldText = $state('');
 
+  const today = localDate();
   const sold = $derived(
-    new Map<string, ClassSold>(unitsSold(app.orders, view.balances, rangeFor('month', localDate())).map((c) => [c.classId, c])),
+    new Map<string, ClassSold>(unitsSold(app.orders, view.balances, rangeFor('month', today)).map((c) => [c.classId, c])),
   );
   const classes = $derived(sortClasses(sideClasses(app.products, side)));
   const tree = $derived(productTree(classes, fieldKey, fieldText));
@@ -120,12 +122,15 @@
       <span class="name">
         <span class="title">{label}</span>
         {#if c.archived}<Tag>Archived</Tag>{/if}
-        {#if isExpenseItem(c)}<Tag>expense</Tag>{:else if !c.sellable}<Tag>raw material</Tag>{/if}
+        {#if !c.sellable && c.trackStock}<Tag>raw material</Tag>{/if}
         {#if c.trackStock && snap && isLowStock(c, snap.stock)}<Tag tone="low">Low</Tag>{/if}
       </span>
       {#if c.trackStock && snap}<span class="qty">{formatAmount(snap.stock, c.unit.decimals, c.unit.name)}</span>{/if}
     </div>
-    {#if !isExpenseItem(c)}<span class="muted">Sold this month: {formatAmount(s?.amount ?? 0, c.unit.decimals, c.unit.name)}</span>{/if}
+    {#if isExpenseItem(c)}
+      {@const f = expenseFigures(app.purchases, c.id, today)}
+      <span class="muted">Last paid {f.last === null ? '—' : formatMoney(f.last)} · this month {formatMoney(f.month)} · this year {formatMoney(f.year)}</span>
+    {:else}<span class="muted">Sold this month: {formatAmount(s?.amount ?? 0, c.unit.decimals, c.unit.name)}</span>{/if}
     {#if c.variants.length}
       <div class="variants" role="table" aria-label="Variants of {fullName(c)}">
         {#each sortedVariants(c.variants) as v (v.id)}
@@ -170,7 +175,11 @@
 {#snippet table()}
   <table class="booktabs">
     <thead>
-      <tr><th>Product</th><th>Stock</th><th>Price</th><th>Cost</th></tr>
+      {#if side === 'expenses'}
+        <tr><th>Item</th><th>Last paid</th><th>Month</th><th>Year</th></tr>
+      {:else}
+        <tr><th>Product</th><th>Stock</th><th>Price</th><th>Cost</th></tr>
+      {/if}
     </thead>
     <tbody>
       {#each tableRows as r (r.kind === 'group' ? `g:${r.node.path}` : r.item.id)}
@@ -197,12 +206,18 @@
           <tr>
             <td style:padding-left={indent(r.depth)}>
               <a class="tname" href="#/products/{c.id}">{c.name}</a>
-              {#if exp}<Tag>expense</Tag>{/if}
               {#if c.trackStock && snap && isLowStock(c, snap.stock)}<Tag tone="low">Low</Tag>{/if}
             </td>
+            {#if exp}
+              {@const f = expenseFigures(app.purchases, c.id, today)}
+              <td class="num">{f.last === null ? '—' : formatMoney(f.last)}</td>
+              <td class="num">{formatMoney(f.month)}</td>
+              <td class="num">{formatMoney(f.year)}</td>
+            {:else}
             <td class="num">{c.trackStock && snap ? formatAmount(snap.stock, c.unit.decimals, c.unit.name) : '—'}</td>
             <td class="num">{exp ? '—' : vs.length === 1 ? priceLabel(vs[0], c.unit.name) : vs.length ? '' : '—'}</td>
             <td class="num">{exp ? '—' : costLabel(vs.length === 1 ? vs[0] : null, snap?.avgCost ?? null, c.unit.decimals, c.unit.name)}</td>
+            {/if}
           </tr>
           {#if vs.length > 1}
             {#each vs as v (v.id)}

@@ -33,6 +33,29 @@ export type ClassSide = 'products' | 'stock' | 'expenses';
 export const sideClasses = <T extends { sellable: boolean; trackStock: boolean }>(classes: T[], side: ClassSide): T[] =>
   classes.filter((c) => (side === 'products' ? c.sellable : side === 'stock' ? !c.sellable && c.trackStock : !c.sellable && !c.trackStock));
 
+/** Expenses list (D-029): last amount paid for an expense item and its totals this month and this year. */
+export function expenseFigures(
+  purchases: { date: string; createdAt: string; voided: boolean; lines: { classId: string; lineTotal: number }[] }[],
+  classId: string,
+  today: string,
+): { last: number | null; lastDate: string | null; month: number; year: number } {
+  let last: number | null = null;
+  let lastKey = '';
+  let lastDate: string | null = null;
+  let month = 0;
+  let year = 0;
+  for (const p of purchases) {
+    if (p.voided) continue;
+    const paid = p.lines.filter((x) => x.classId === classId).reduce((s, x) => s + x.lineTotal, 0);
+    if (!p.lines.some((x) => x.classId === classId)) continue;
+    if (p.date.startsWith(today.slice(0, 7))) month += paid;
+    if (p.date.startsWith(today.slice(0, 4))) year += paid;
+    const key = p.date + p.createdAt;
+    if (key > lastKey) [lastKey, last, lastDate] = [key, paid, p.date];
+  }
+  return { last, lastDate, month, year };
+}
+
 export const sortedVariants = <T extends { sortOrder: number }>(vs: T[]): T[] =>
   [...vs].sort((a, b) => a.sortOrder - b.sortOrder);
 

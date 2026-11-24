@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   costLabel,
+  expenseFigures,
   fieldKey,
   priceLabel,
   moveVariant,
@@ -124,5 +125,20 @@ describe('sideClasses (D-025)', () => {
     expect(sideClasses(all, 'products').map((x) => x.id)).toEqual(['jar', 'service']);
     expect(sideClasses(all, 'stock').map((x) => x.id)).toEqual(['bulk', 'lid']);
     expect(sideClasses(all, 'expenses').map((x) => x.id)).toEqual(['fuel']);
+  });
+});
+
+describe('expenseFigures (Expenses list, D-029)', () => {
+  const l = (classId: string, lineTotal: number) => ({ classId, lineTotal });
+  const p = (date: string, lines: ReturnType<typeof l>[], voided = false) => ({ date, createdAt: `${date}T10:00:00Z`, voided, lines });
+  const purchases = [
+    p('2025-12-30', [l('fuel', 3000)]),
+    p('2026-10-14', [l('fuel', 4000), l('fuel', 500)]),
+    p('2026-11-02', [l('fuel', 4100), l('phone', 2900)]),
+    p('2026-11-20', [l('fuel', 9999)], true),
+  ];
+  it('last paid (newest purchase, its lines summed), this month and this year; voided ignored', () => {
+    expect(expenseFigures(purchases, 'fuel', '2026-11-24')).toEqual({ last: 4100, lastDate: '2026-11-02', month: 4100, year: 8600 });
+    expect(expenseFigures(purchases, 'vet', '2026-11-24')).toEqual({ last: null, lastDate: null, month: 0, year: 0 });
   });
 });
