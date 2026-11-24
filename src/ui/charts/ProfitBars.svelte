@@ -2,7 +2,7 @@
   import { profitBarGeometry, VIEW } from './geometry.ts';
   import { tickMoney, type TrendPoint } from '../screens/profit/logic.ts';
 
-  // Sales and net profit per month in hand-built SVG; a loss goes below the zero line. Tapping a month selects it.
+  // One bar per month in hand-built SVG: sales, with net profit over it (the grey rest is costs); a loss goes below zero. Tapping a month selects it.
   let {
     points,
     format,

@@ -120,7 +120,7 @@ describe('Overview section buttons (D-032)', () => {
 
 describe('profitBarGeometry', () => {
   const plotH = VIEW.h - VIEW.top - VIEW.bottom;
-  it('draws sales up from zero and a loss below the zero line', () => {
+  it('draws sales up from zero, net profit over it, and a loss below the zero line', () => {
     const g = profitBarGeometry([{ sales: 1000, net: 500 }, { sales: 300, net: -300 }]);
     expect(g.ticks.map((t) => t.value)).toEqual([-500, 0, 1000]);
     expect(g.zeroY).toBeCloseTo(VIEW.top + (plotH * 2) / 3);
@@ -131,7 +131,9 @@ describe('profitBarGeometry', () => {
     expect(b.netY).toBeCloseTo(g.zeroY);
     expect(b.netH).toBeCloseTo((300 / 1500) * plotH);
     expect(b.loss).toBe(true);
-    expect(a.netX).toBeGreaterThan(a.salesX);
+    // One bar per month: net profit overlays the sales bar (the rest is costs), a loss hangs below it.
+    expect(a.netX).toBe(a.salesX);
+    expect(b.netX).toBe(b.salesX);
   });
   it('keeps the zero line at the bottom without losses', () => {
     const g = profitBarGeometry([{ sales: 800, net: 200 }, { sales: 0, net: 0 }]);
