@@ -15,16 +15,39 @@
   import { showToast } from '../../toast.svelte.ts';
   import { checkAppUpdate } from '../../update.ts';
   import OwedCard from './OwedCard.svelte';
-  import ProfitCard from './ProfitCard.svelte';
   import SyncBadge from './SyncBadge.svelte';
   import UnitsSold from './UnitsSold.svelte';
   import { stockLine } from './stockLine.ts';
-  import { owedDetail, viewRange } from './logic.ts';
+  import { SECTION_KEY, owedDetail, parseSection, toggleSection, viewRange, type Section } from './logic.ts';
   import type { RangeKind } from './logic.ts';
 
   let {}: { params?: Record<string, string>; query?: Record<string, string> } = $props();
 
   const today = $derived(localDate());
+
+  // One section at a time under the owed card, remembered per device (D-032).
+  function readSection(): Section | null {
+    try {
+      return parseSection(localStorage.getItem(SECTION_KEY));
+    } catch {
+      return null;
+    }
+  }
+  let section = $state<Section | null>(readSection());
+  function tapSection(v: Section) {
+    section = toggleSection(section, v);
+    try {
+      localStorage.setItem(SECTION_KEY, section ?? '');
+    } catch {
+      // Storage blocked: the choice still applies for this visit.
+    }
+  }
+  const sectionOptions: { value: Section; label: string }[] = [
+    { value: 'owes', label: 'Who owes' },
+    { value: 'top', label: 'Top clients' },
+    { value: 'units', label: 'Units sold' },
+    { value: 'stock', label: 'Stock' },
+  ];
 
   // Sync button: pulls and pushes data now (not in Demo mode) and checks for a new app version.
   let checking = $state(false);
@@ -81,6 +104,13 @@
 
   <OwedCard />
 
+  <div class="sections" role="group" aria-label="Sections">
+    {#each sectionOptions as o (o.value)}
+      <button type="button" class="sec-btn" aria-pressed={section === o.value} onclick={() => tapSection(o.value)}>{o.label}</button>
+    {/each}
+  </div>
+
+  {#if section === 'owes'}
   <section class="card">
     <div class="section-head">
       <h2>Who owes</h2>
@@ -98,10 +128,12 @@
       {/each}
     </div>
   </section>
+  {/if}
 
+  {#if section === 'units' || section === 'top'}
   <section class="card units">
     <div class="row-between">
-      <h2>Units sold</h2>
+      <h2>{section === 'units' ? 'Units sold' : `Top clients ${rangeNoun}`}</h2>
     </div>
     <Segmented
       label="Range"
@@ -114,10 +146,25 @@
         <div class="field"><label for="ov-to">To</label><input id="ov-to" class="input" type="date" bind:value={customTo} /></div>
       </div>
     {/if}
-    <UnitsSold {range} />
+    {#if section === 'units'}
+      <UnitsSold {range} />
+    {:else}
+      <div class="list">
+        {#each top as c (c.clientId)}
+          <a class="list-row" href="#/clients/{c.clientId}">
+            <Avatar name={c.clientName} />
+            <span class="grow title">{c.clientName}</span>
+            <span class="amount">{formatMoney(c.value)}</span>
+          </a>
+        {:else}
+          <p class="muted">No sales in this range.</p>
+        {/each}
+      </div>
+    {/if}
   </section>
+  {/if}
 
-  {#if stock.length > 0}
+  {#if section === 'stock'}
     <section class="card">
       <div class="section-head">
         <h2>Stock</h2>
@@ -133,25 +180,12 @@
             {#if s.low}<Tag tone="low">Low</Tag>{/if}
             <span class="amount">{formatAmount(s.stock, s.cls.unit.decimals, s.cls.unit.name)}</span>
           </a>
+        {:else}
+          <p class="muted">No products with stock tracking yet.</p>
         {/each}
       </div>
     </section>
   {/if}
-
-  <section class="card">
-    <h2>Top clients {rangeNoun}</h2>
-    <div class="list">
-      {#each top as c (c.clientId)}
-        <a class="list-row" href="#/clients/{c.clientId}">
-          <Avatar name={c.clientName} />
-          <span class="grow title">{c.clientName}</span>
-          <span class="amount">{formatMoney(c.value)}</span>
-        </a>
-      {:else}
-        <p class="muted">No sales in this range.</p>
-      {/each}
-    </div>
-  </section>
 
   <section class="pair">
     <div class="card"><span class="muted">Sales {rangeNoun}</span><span class="big">{formatMoney(sales)}</span></div>
@@ -159,7 +193,9 @@
     <div class="card"><span class="muted">Spent {rangeNoun}</span><span class="big">{formatMoney(spent)}</span></div>
   </section>
 
-  <ProfitCard {range} />
+  <section class="card">
+    <a class="list-row" href="#/profit"><span class="grow title">Profit, margins and costs</span><span class="muted">Profit tab</span><Icon name="chevron" size={18} /></a>
+  </section>
 </div>
 
 <style>
@@ -176,6 +212,26 @@
     to {
       transform: rotate(360deg);
     }
+  }
+  .sections {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .sec-btn {
+    min-height: var(--tap);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--surface);
+    color: var(--ink);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .sec-btn[aria-pressed='true'] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--on-accent);
   }
   .page {
     padding-bottom: calc(var(--nav-h) + 96px);

@@ -2,6 +2,7 @@
   // Inline stroke icons (spec §10: no emoji). Shapes follow the mockups.
   const paths = {
     overview: ['M3 12h4l3-8 4 16 3-8h4'],
+    profit: ['M4 20V4', 'M4 20h16', 'M8 16l4-5 3 3 5-7'],
     orders: ['M7 3h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z', 'M9 8h6M9 12h6M9 16h4'],
     expenses: ['M6 3h12v18l-3-2-3 2-3-2-3 2z', 'M9 8h6M9 12h6'],
     clients: ['M12 4a4 4 0 1 1 0 8 4 4 0 0 1 0-8z', 'M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6'],

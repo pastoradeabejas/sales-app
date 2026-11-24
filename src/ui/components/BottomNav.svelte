@@ -11,6 +11,7 @@
     { tab: 'orders', label: 'Orders' },
     { tab: 'expenses', label: 'Expenses' },
     { tab: 'stock', label: 'Stock' },
+    { tab: 'profit', label: 'Profit' },
   ];
 </script>
 
@@ -32,7 +33,7 @@
     position: fixed;
     inset: auto 0 0 0;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     min-height: var(--nav-h);
     padding-bottom: env(safe-area-inset-bottom);
     background: var(--surface);

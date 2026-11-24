@@ -1,6 +1,6 @@
 // Hash routes (spec §7, plus #/orders/:id/edit from §8.4). Pure: no DOM.
 
-export type Tab = 'overview' | 'orders' | 'expenses' | 'stock';
+export type Tab = 'overview' | 'orders' | 'expenses' | 'stock' | 'profit';
 
 const routes = [
   ['overview', 'overview', 'overview'],
@@ -26,6 +26,7 @@ const routes = [
   ['purchase-edit', 'purchases/:id/edit', 'expenses'],
   ['suppliers', 'suppliers', 'expenses'],
   ['supplier', 'suppliers/:id', 'expenses'],
+  ['profit', 'profit', 'profit'],
 ] as const satisfies readonly (readonly [string, string, Tab])[];
 
 export type RouteName = (typeof routes)[number][0];

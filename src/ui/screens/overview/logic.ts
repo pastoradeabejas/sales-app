@@ -60,3 +60,11 @@ export function bucketLabel(start: string, bucket: Bucket): string {
   return bucket === 'month' ? month : `${Number(start.slice(8, 10))} ${month}`;
 }
 
+
+/** Overview sections shown one at a time under the owed card (D-032). */
+export type Section = 'owes' | 'top' | 'units' | 'stock';
+export const SECTION_KEY = 'overviewSection';
+export const parseSection = (raw: string | null): Section | null =>
+  raw === 'owes' || raw === 'top' || raw === 'units' || raw === 'stock' ? raw : null;
+/** Tapping the open section's button closes it; any other button opens its section. */
+export const toggleSection = (open: Section | null, tapped: Section): Section | null => (open === tapped ? null : tapped);
