@@ -17,13 +17,15 @@
     classes.map((c) => {
       const s = view.snapshot.get(c.id);
       const stock = s?.stock ?? 0;
+      const rate = sellRate(c.id, app.orders, today);
       return {
         name: c.name,
         group: c.group,
         cls: c,
         stock,
         low: isLowStock(c, stock),
-        left: daysLeftText(c, stock, sellRate(c.id, app.orders, today)),
+        // Only real estimates on the list (D-016); "not enough data" stays on the detail page.
+        left: rate.enoughData ? daysLeftText(c, stock, rate) : '',
       };
     }),
   );
