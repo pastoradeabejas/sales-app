@@ -144,6 +144,8 @@ export function movementLabel(m: Movement, classesById: Map<Id, ProductClass>): 
       return `Transform out (to ${others})`;
     case 'sale':
       return `Sale (${m.clientName ?? ''})`;
+    case 'purchase':
+      return m.supplierName ? `Purchase (from ${m.supplierName})` : 'Purchase';
   }
 }
 

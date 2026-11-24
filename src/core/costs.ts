@@ -1,5 +1,5 @@
 // Materials, transform costs and average cost lookups (spec §3.6b, D-005).
-import type { ClassAmount, Cents, CostExtra, CostShare, Order, ProductClass, StockEvent, TransformCosts, UnitCost } from './types.ts';
+import type { ClassAmount, Cents, CostExtra, CostShare, Order, ProductClass, Purchase, StockEvent, TransformCosts, UnitCost } from './types.ts';
 import { classTimeline, perBaseUnit } from './stock.ts';
 
 // Half-up to whole cents; toPrecision strips float noise such as 7.4999999.
@@ -74,8 +74,9 @@ export function averageCostAt(
   events: StockEvent[],
   classesById: Map<string, ProductClass>,
   upTo?: { date: string; createdAt: string },
+  purchases: Purchase[] = [],
 ): UnitCost | null {
-  const t = classTimeline(cls, orders, events, classesById).filter(
+  const t = classTimeline(cls, orders, events, classesById, purchases).filter(
     (m) => !upTo || m.date < upTo.date || (m.date === upTo.date && m.createdAt <= upTo.createdAt),
   );
   return t[t.length - 1]?.avgCostAfter ?? null;

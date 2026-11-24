@@ -300,3 +300,11 @@ describe('recipe helpers', () => {
     expect(recipeNameError('Cheese', all, null)).toBe('');
   });
 });
+
+describe('movementLabel for purchases (§16.3)', () => {
+  const m = (supplierName: string) => ({ kind: 'purchase', supplierName }) as unknown as Parameters<typeof movementLabel>[0];
+  it('names the supplier when there is one', () => {
+    expect(movementLabel(m('Envases'), new Map())).toBe('Purchase (from Envases)');
+    expect(movementLabel(m(''), new Map())).toBe('Purchase');
+  });
+});
