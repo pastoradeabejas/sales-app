@@ -81,9 +81,10 @@ export interface VariantValue {
   kind: VariantKind;
   baseAmount: number | null;
   price: Cents;
-  cost: UnitCost | null;
+  /** Extra cost per item (per unit when variable) on top of the class average: packaging… */
+  extraCost: UnitCost | null;
 }
-type VariantErrors = Partial<Record<'label' | 'amount' | 'price' | 'cost', string>>;
+type VariantErrors = Partial<Record<'label' | 'amount' | 'price' | 'extraCost', string>>;
 
 export function parseVariantForm(
   f: VariantForm,
@@ -102,10 +103,10 @@ export function parseVariantForm(
   const price = parseMoney(f.priceText);
   if (price === null) errors.price = 'Enter a price (0 to 1,000,000)';
   const costBlank = f.costText.trim() === '';
-  const cost = costBlank ? null : parseUnitCost(f.costText);
-  if (!costBlank && cost === null) errors.cost = 'Enter a valid cost or leave empty';
+  const extraCost = costBlank ? null : parseUnitCost(f.costText);
+  if (!costBlank && extraCost === null) errors.extraCost = 'Enter a valid cost or leave empty';
   if (Object.keys(errors).length) return { errors, value: null };
-  return { errors, value: { label, kind: f.kind, baseAmount, price: price as Cents, cost } };
+  return { errors, value: { label, kind: f.kind, baseAmount, price: price as Cents, extraCost } };
 }
 
 /** Key for a new custom field from its label, unique among existing keys. */
@@ -122,7 +123,7 @@ export const priceLabel = (v: { kind: VariantKind; price: Cents }, unitName: str
 
 /** Cost shown in the table: a variant's sale cost (§3.6b), or the class average per unit when `v` is null. */
 export function costLabel(
-  v: Pick<Variant, 'kind' | 'cost' | 'baseAmount'> | null,
+  v: Pick<Variant, 'kind' | 'cost' | 'baseAmount' | 'extraCost'> | null,
   avg: UnitCost | null,
   decimals: Decimals,
   unitName: string,

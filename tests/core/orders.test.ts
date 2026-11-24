@@ -25,8 +25,16 @@ describe('totals', () => {
 });
 
 describe('saleUnitCost', () => {
-  it('prefers variant cost', () => {
-    expect(saleUnitCost({ ...fixedV, cost: 750 }, 1, 3)).toBe(750);
+  it('is the class average × the content plus the variant extra cost (packaging…)', () => {
+    expect(saleUnitCost({ ...fixedV, extraCost: 15 }, 2, 3)).toBe(16); // 2 × 0.5 + 15
+    expect(saleUnitCost({ ...varV, extraCost: 10 }, 2.5, 3)).toBe(12.5);
+  });
+  it('uses the class average even when a full cost was typed on the variant', () => {
+    expect(saleUnitCost({ ...fixedV, cost: 750 }, 1, 3)).toBe(0.5);
+  });
+  it('a typed full cost is the fallback when there is no class average', () => {
+    expect(saleUnitCost({ ...fixedV, cost: 750 }, null, 3)).toBe(750);
+    expect(saleUnitCost({ ...fixedV, extraCost: 15 }, null, 3)).toBeNull();
   });
   it('derives from class average', () => {
     expect(saleUnitCost(fixedV, 2, 3)).toBe(1); // 2 per base unit x 0.5

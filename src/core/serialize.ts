@@ -23,7 +23,7 @@ const TOP: Record<RecordType, string[]> = {
 const NESTED: Record<string, string[]> = {
   unit: ['name', 'decimals'],
   customFields: ['key', 'label', 'type'],
-  variants: ['id', 'label', 'kind', 'baseAmount', 'price', 'cost', 'sortOrder', 'archived', ...STAMPS],
+  variants: ['id', 'label', 'kind', 'baseAmount', 'price', 'cost', 'extraCost', 'sortOrder', 'archived', ...STAMPS],
   lines: ['lineId', 'classId', 'variantId', 'className', 'variantLabel', 'kind', 'unitName', 'decimals', 'quantity', 'amount', 'unitPrice', 'unitCost', 'lineTotal'],
   inputs: ['classId', 'amount'],
   outputs: ['classId', 'amount'],

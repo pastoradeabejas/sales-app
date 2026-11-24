@@ -104,17 +104,17 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
   const products: ProductClass[] = [];
   const product = (
     group: string, name: string, unit: string, decimals: Decimals, low: number | null, sellable: boolean,
-    vs: [key: string, label: string, baseAmount: number | null, price: number, cost: number | null, archived?: boolean][] = [],
+    vs: [key: string, label: string, baseAmount: number | null, price: number, extraCost: number | null, archived?: boolean][] = [],
     extra: Partial<ProductClass> = {},
   ): ProductClass => {
     const cls: ProductClass = {
       ...made, id: `demo-class-${String(products.length + 1).padStart(2, '0')}`, name, group, unit: { name: unit, decimals },
       lowStockThreshold: low, trackStock: true, sellable, customFields: [], customValues: {}, notes: '', archived: false, variants: [], ...extra,
     };
-    cls.variants = vs.map(([key, label, baseAmount, price, cost, archived], i) => {
+    cls.variants = vs.map(([key, label, baseAmount, price, extraCost, archived], i) => {
       const v: Variant = {
         createdAt: made.createdAt, updatedAt: now, updatedBy: 'Demo', id: `demo-var-${key}`, label, kind: baseAmount === null ? 'variable' : 'fixed',
-        baseAmount, price, cost, sortOrder: i + 1, archived: archived ?? false,
+        baseAmount, price, cost: null, ...(extraCost ? { extraCost } : {}), sortOrder: i + 1, archived: archived ?? false,
       };
       variants.set(key, { cls, v });
       return v;
@@ -126,21 +126,21 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
     customFields: [{ key: 'harvest', label: 'Harvest', type: 'text' }], customValues: { harvest: season },
   });
   const bulk = (honey: string) => product(`Honey/${honey}`, 'Bulk', 'kg', 3, 5000, false);
-  const jar = (honey: string, name: string, key: string, label: string, price: number, cost: number, low: number, season: string) =>
-    product(`Honey/${honey}`, name, 'jar', 0, low, true, [[key, label, 1, price, cost]], harvest(season));
+  const jar = (honey: string, name: string, key: string, label: string, price: number, low: number, season: string) =>
+    product(`Honey/${honey}`, name, 'jar', 0, low, true, [[key, label, 1, price, null]], harvest(season));
   const flowerBulk = bulk('Flower');
-  const f5 = jar('Flower', '500g Jar', 'f5', '500 g', 850, 390, 10, 'Spring');
-  const f1 = jar('Flower', '1kg Jar', 'f1', '1 kg', 1500, 770, 10, 'Spring');
+  const f5 = jar('Flower', '500g Jar', 'f5', '500 g', 850, 10, 'Spring');
+  const f1 = jar('Flower', '1kg Jar', 'f1', '1 kg', 1500, 10, 'Spring');
   const rosemaryBulk = bulk('Rosemary');
-  const r5 = jar('Rosemary', '500g Jar', 'r5', '500 g', 950, 465, 10, 'Spring');
-  const r1 = jar('Rosemary', '1kg Jar', 'r1', '1 kg', 1700, 880, 10, 'Spring');
+  const r5 = jar('Rosemary', '500g Jar', 'r5', '500 g', 950, 10, 'Spring');
+  const r1 = jar('Rosemary', '1kg Jar', 'r1', '1 kg', 1700, 10, 'Spring');
   const oakBulk = bulk('Oak');
-  const o5 = jar('Oak', '500g Jar', 'o5', '500 g', 900, 515, 10, 'Autumn');
-  const o1 = jar('Oak', '1kg Jar', 'o1', '1 kg', 1600, 980, 10, 'Autumn');
+  const o5 = jar('Oak', '500g Jar', 'o5', '500 g', 900, 10, 'Autumn');
+  const o1 = jar('Oak', '1kg Jar', 'o1', '1 kg', 1600, 10, 'Autumn');
   const heatherBulk = bulk('Heather');
-  const h5 = jar('Heather', '500g Jar', 'h5', '500 g', 1250, 555, 10, 'Autumn');
-  const h1 = jar('Heather', '1kg Jar', 'h1', '1 kg', 2200, 1070, 8, 'Autumn');
-  const lavender = product('Honey/Lavender', '500g Jar', 'jar', 0, 10, true, [['lav', '500 g', 1, 1100, 520]], { ...harvest('Summer'), archived: true, notes: 'No longer made.' });
+  const h5 = jar('Heather', '500g Jar', 'h5', '500 g', 1250, 10, 'Autumn');
+  const h1 = jar('Heather', '1kg Jar', 'h1', '1 kg', 2200, 8, 'Autumn');
+  const lavender = product('Honey/Lavender', '500g Jar', 'jar', 0, 10, true, [['lav', '500 g', 1, 1100, null]], { ...harvest('Summer'), archived: true, notes: 'No longer made.' });
   const chestnut = product('Honey/Chestnut', '500g Jar', 'jar', 0, 6, true, [['ch5', '500 g', 1, 1000, null]], { notes: "From a neighbour's hives; no cost known." });
   const packaging = (name: string, low: number) => product('Packaging', name, 'pcs', 0, low, false);
   const emptyJar5 = packaging('Empty jar 500g', 30);
@@ -150,30 +150,29 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
   const labels = packaging('Labels', 100);
   const butterPaper = packaging('Butter paper', 30);
   const kefirBottle = packaging('Kefir bottle', 20);
-  const eggBox = packaging('Egg box', 20);
-  const xmasBox = product('Gifts', 'Christmas box', 'pcs', 0, 3, true, [['box', 'Box', 1, 2500, 1520], ['box2', 'Deluxe (honey + candle)', 1, 3600, null]]);
-  const comb = product('Honeycomb', 'Honeycomb', 'kg', 3, 2000, true, [['comb', 'By weight', null, 3000, 2000]]);
-  const pollen = product('Pollen', '250g Jar', 'jar', 0, 8, true, [['pol', '250 g', 1, 700, 250]]);
+  const xmasBox = product('Gifts', 'Christmas box', 'pcs', 0, 3, true, [['box', 'Box', 1, 2500, null], ['box2', 'Deluxe (honey + candle)', 1, 3600, null]]);
+  const comb = product('Honeycomb', 'Honeycomb', 'kg', 3, 2000, true, [['comb', 'By weight', null, 3000, null]]);
+  const pollen = product('Pollen', '250g Jar', 'jar', 0, 8, true, [['pol', '250 g', 1, 700, null]]);
   const rawMilk = product('Dairy/Milk', 'Raw milk', 'L', 0, 50, false);
-  const bottle = product('Dairy/Milk', '1L Bottle', 'bottle', 0, 10, true, [['mk', '1 L', 1, 180, 90]]);
-  const curedCheese = product('Dairy/Cheese', 'Cured cheese', 'kg', 3, 2000, true, [['chw', 'By weight', null, 1800, 900], ['chq', 'Quarter 750 g', 750, 1350, 700]], {
+  const bottle = product('Dairy/Milk', '1L Bottle', 'bottle', 0, 10, true, [['mk', '1 L', 1, 180, null]]);
+  const curedCheese = product('Dairy/Cheese', 'Cured cheese', 'kg', 3, 2000, true, [['chw', 'By weight', null, 1800, null], ['chq', 'Quarter 750 g', 750, 1350, 10]], {
     customFields: [{ key: 'cure', label: 'Cure (months)', type: 'number' }], customValues: { cure: 6 },
   });
   const whey = product('Dairy/Cheese', 'Whey', 'L', 0, 10, true, [['wh', '1 L', 1, 150, null]], { notes: 'Made with the cured cheese.' });
-  const freshCheese = product('Dairy/Cheese', 'Fresh cheese', 'pcs', 0, 6, true, [['fc', '250 g', 1, 350, 160]]);
-  const yogurt = product('Dairy/Yogurt', 'Natural yogurt', 'pot', 0, 10, true, [['y1', 'Single', 1, 90, 40], ['y4', 'Pack of 4', 4, 320, 160]]);
-  const butter = product('Dairy/Butter', 'Butter', 'pcs', 0, 8, true, [['but', '250 g', 1, 480, 260]]);
-  const kefir = product('Dairy/Kefir', 'Kefir', 'bottle', 0, 8, true, [['kef', '500 ml', 1, 280, 120]]);
-  const chorizo = product('Meat/Pork', 'Chorizo', 'pcs', 0, 5, true, [['cho', 'Piece', 1, 650, 380]]);
-  const porkLoin = product('Meat/Pork', 'Pork loin', 'kg', 3, 3000, true, [['pl', 'By weight', null, 1100, 700]]);
-  const sausages = product('Meat/Pork', 'Sausages', 'kg', 3, 2000, true, [['sau', 'By weight', null, 1450, 900], ['sa4', '400 g pack', 400, 620, 380]]);
-  const minced = product('Meat/Beef', 'Minced beef', 'kg', 3, 2000, true, [['mbf', 'By weight', null, 1300, 850], ['mb5', '500 g pack', 500, 700, 430]]);
-  const steak = product('Meat/Beef', 'Steak', 'kg', 3, 1000, true, [['stk', 'By weight', null, 2600, 1700]]);
-  const lamb = product('Meat/Lamb', 'Lamb chops', 'kg', 3, 1500, true, [['lam', 'By weight', null, 2400, 1600]]);
+  const freshCheese = product('Dairy/Cheese', 'Fresh cheese', 'pcs', 0, 6, true, [['fc', '250 g', 1, 350, null]]);
+  const yogurt = product('Dairy/Yogurt', 'Natural yogurt', 'pot', 0, 10, true, [['y1', 'Single', 1, 90, null], ['y4', 'Pack of 4', 4, 320, 5]]);
+  const butter = product('Dairy/Butter', 'Butter', 'pcs', 0, 8, true, [['but', '250 g', 1, 480, null]]);
+  const kefir = product('Dairy/Kefir', 'Kefir', 'bottle', 0, 8, true, [['kef', '500 ml', 1, 280, null]]);
+  const chorizo = product('Meat/Pork', 'Chorizo', 'pcs', 0, 5, true, [['cho', 'Piece', 1, 650, null]]);
+  const porkLoin = product('Meat/Pork', 'Pork loin', 'kg', 3, 3000, true, [['pl', 'By weight', null, 1100, null]]);
+  const sausages = product('Meat/Pork', 'Sausages', 'kg', 3, 2000, true, [['sau', 'By weight', null, 1450, null], ['sa4', '400 g pack', 400, 620, 8]]);
+  const minced = product('Meat/Beef', 'Minced beef', 'kg', 3, 2000, true, [['mbf', 'By weight', null, 1300, null], ['mb5', '500 g pack', 500, 700, 8]]);
+  const steak = product('Meat/Beef', 'Steak', 'kg', 3, 1000, true, [['stk', 'By weight', null, 2600, null]]);
+  const lamb = product('Meat/Lamb', 'Lamb chops', 'kg', 3, 1500, true, [['lam', 'By weight', null, 2400, null]]);
   const smallCandle = product('Candles', 'Small candle', 'pcs', 0, 10, true, [['cs', 'Beeswax', 1, 650, null]]);
   const largeCandle = product('Candles', 'Large candle', 'pcs', 0, 6, true, [['cl', 'Beeswax', 1, 1450, null]]);
-  const propolis = product('Wellness', 'Propolis tincture', 'pcs', 0, 5, true, [['prop', '30 ml', 1, 1200, 600]]);
-  const eggs = product('Eggs', 'Eggs', 'egg', 0, 24, true, [['dz', 'Dozen', 12, 360, 220], ['hd', 'Half dozen', 6, 190, null], ['dzt', 'Tray of 30', 30, 850, 520, true]]);
+  const propolis = product('Wellness', 'Propolis tincture', 'pcs', 0, 5, true, [['prop', '30 ml', 1, 1200, null]]);
+  const eggs = product('Eggs', 'Eggs', 'egg', 0, 24, true, [['dz', 'Dozen', 12, 360, 15], ['hd', 'Half dozen', 6, 190, 10], ['dzt', 'Tray of 30', 30, 850, 30, true]]);
   const raw = (name: string, unit: string, decimals: Decimals, low: number) => product('Raw materials', name, unit, decimals, low, false);
   const wick = raw('Candle wick', 'm', 2, 500);
   const beeswax = raw('Beeswax', 'kg', 3, 1000);
@@ -228,7 +227,7 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
   maker(recipe('butter', 'Make butter', [[rawMilk, 10], [butterPaper, 4]], [[butter, 4]], [['Salt', 30], ['Electricity', 30]], [[L2, 15]]), 3);
   maker(recipe('kefir', 'Make kefir', [[rawMilk, 1], [kefirBottle, 2]], [[kefir, 2]], [['Cultures', 25]], [[L1, 6]]), 10);
   maker(recipe('sausage', 'Make sausages', [[porkShoulder, 10000], [casing, 800]], [[sausages, 9000]], [['Spices', 1200], ['Electricity', 40]], [[L3, 60]]), 1);
-  maker(recipe('eggs', 'Pack eggs', [[looseEggs, 12], [eggBox, 1]], [[eggs, 12]], [['Label', 5]], [[L1, 2]]), 10);
+  maker(recipe('eggs', 'Grade eggs', [[looseEggs, 12]], [[eggs, 12]], [], [[L1, 1]]), 10);
   maker(recipe('cheese', 'Make cured cheese and whey', [[rawMilk, 10]], [[curedCheese, 1000], [whey, 1]], [['Rennet & salt', 150]], [[L3, 8]], [0.95, 0.05]), 6);
   maker(recipe('fresh', 'Make fresh cheese', [[rawMilk, 2]], [[freshCheese, 1]], [['Salt', 5]], [[L1, 4]]), 12);
   maker(recipe('bottle', 'Bottle milk', [[rawMilk, 1]], [[bottle, 1]], [['Bottle', 40]], [[L1, 1]]), 30);
@@ -241,7 +240,7 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
   source(lavender, apicola, 24, 520); source(comb, apicola, 8000, 2000); source(pollen, apicola, 24, 250); source(propolis, apicola, 12, 600);
   source(beeswax, apicola, 5000, 2200); source(wick, apicola, 1000, 90);
   source(emptyJar5, envases, 200, 35); source(emptyJar1, envases, 120, 50); source(lid, envases, 300, 12); source(giftBox, envases, 30, 150);
-  source(butterPaper, envases, 100, 8); source(kefirBottle, envases, 100, 45); source(eggBox, envases, 100, 15); source(casing, envases, 2000, 15);
+  source(butterPaper, envases, 100, 8); source(kefirBottle, envases, 100, 45); source(casing, envases, 2000, 15);
   source(chestnut, null, 24, 0); source(labels, imprenta, 500, 6); source(rawMilk, granja, 300, 45); source(looseEggs, granja, 360, 15);
   source(chorizo, carnes, 30, 380); source(porkLoin, carnes, 10000, 700); source(minced, carnes, 10000, 850); source(steak, carnes, 6000, 1700);
   source(lamb, carnes, 10000, 1600); source(porkShoulder, carnes, 20000, 450);

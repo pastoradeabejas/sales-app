@@ -17,12 +17,16 @@ export function orderTotal(lines: Pick<OrderLine, 'lineTotal'>[]): Cents {
   return lines.reduce((sum, l) => sum + l.lineTotal, 0);
 }
 
-// Cost snapshot for a sale line: variant cost, else class average (§3.6b), else null.
-export function saleUnitCost(variant: Pick<Variant, 'kind' | 'cost' | 'baseAmount'>, classAvgCost: number | null, decimals: number): UnitCost | null {
-  if (variant.cost !== null) return variant.cost;
-  if (classAvgCost === null) return null;
-  const perItem = variant.kind === 'fixed' ? (classAvgCost * (variant.baseAmount ?? 0)) / 10 ** decimals : classAvgCost;
-  return roundCost(perItem);
+// Cost snapshot for a sale line (D-040): class average × content + the variant's extra cost;
+// without a class average, the full cost typed on the variant; else null.
+export function saleUnitCost(
+  variant: Pick<Variant, 'kind' | 'cost' | 'baseAmount' | 'extraCost'>,
+  classAvgCost: number | null,
+  decimals: number,
+): UnitCost | null {
+  if (classAvgCost === null) return variant.cost;
+  const content = variant.kind === 'fixed' ? (classAvgCost * (variant.baseAmount ?? 0)) / 10 ** decimals : classAvgCost;
+  return roundCost(content + (variant.extraCost ?? 0));
 }
 
 // Build an order line from a variant, snapshotting names, unit, price and cost.

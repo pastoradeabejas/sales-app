@@ -64,16 +64,16 @@ describe('parseVariantForm', () => {
   it('parses a fixed variant', () => {
     const r = parseVariantForm(ok, 3, sib);
     expect(r.errors).toEqual({});
-    expect(r.value).toEqual({ label: '500 g', kind: 'fixed', baseAmount: 500, price: 1400, cost: null });
+    expect(r.value).toEqual({ label: '500 g', kind: 'fixed', baseAmount: 500, price: 1400, extraCost: null });
   });
-  it('parses a variable variant with cost', () => {
+  it('parses a variable variant with an extra cost', () => {
     const r = parseVariantForm({ ...ok, kind: 'variable', amountText: '', costText: '7,5' }, 3, sib);
-    expect(r.value).toEqual({ label: '500 g', kind: 'variable', baseAmount: null, price: 1400, cost: 750 });
+    expect(r.value).toEqual({ label: '500 g', kind: 'variable', baseAmount: null, price: 1400, extraCost: 750 });
   });
   it('allows price 0', () => expect(parseVariantForm({ ...ok, priceText: '0' }, 3, sib).value?.price).toBe(0));
-  it('flags empty label, bad amount, bad price, bad cost', () => {
+  it('flags empty label, bad amount, bad price, bad extra cost', () => {
     const r = parseVariantForm({ label: ' ', kind: 'fixed', amountText: '0', priceText: 'x', costText: 'y' }, 2, sib);
-    expect(Object.keys(r.errors).sort()).toEqual(['amount', 'cost', 'label', 'price']);
+    expect(Object.keys(r.errors).sort()).toEqual(['amount', 'extraCost', 'label', 'price']);
     expect(r.value).toBeNull();
   });
   it('ignores amount for variable', () => {
@@ -108,14 +108,16 @@ describe('costLabel', () => {
     expect(costLabel(null, 18.125, 0, 'pot')).toBe('€0.19/pot');
     expect(costLabel(null, 15, 0, 'pcs')).toBe('€0.15/pcs');
   });
-  const v = (kind: 'fixed' | 'variable', cost: number | null, baseAmount: number | null = null) => ({ kind, cost, baseAmount });
+  const v = (kind: 'fixed' | 'variable', cost: number | null, baseAmount: number | null = null, extraCost: number | null = null) => ({ kind, cost, baseAmount, extraCost });
   it('shows the class average per unit, or a dash when unknown', () => {
     expect(costLabel(null, 15, 0, 'pcs')).toBe('€0.15/pcs');
     expect(costLabel(null, null, 0, 'pcs')).toBe('—');
   });
-  it('prefers the variant cost', () => {
-    expect(costLabel(v('fixed', 390), 1000, 0, 'jar')).toBe('€3.90');
-    expect(costLabel(v('variable', 950), 1000, 2, 'kg')).toBe('€9.50/kg');
+  it('average × content plus the extra cost; a typed full cost only without an average', () => {
+    expect(costLabel(v('fixed', null, 12, 15), 17, 0, 'egg')).toBe('€2.19');
+    expect(costLabel(v('fixed', 390, 1), 1000, 0, 'jar')).toBe('€10.00');
+    expect(costLabel(v('fixed', 390, 1), null, 0, 'jar')).toBe('€3.90');
+    expect(costLabel(v('variable', 950), null, 2, 'kg')).toBe('€9.50/kg');
   });
   it('falls back to the class average for the variant', () => {
     expect(costLabel(v('fixed', null, 75), 1200, 2, 'kg')).toBe('€9.00');

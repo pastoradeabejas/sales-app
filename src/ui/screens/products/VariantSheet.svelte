@@ -39,7 +39,7 @@
     kind = variant?.kind ?? 'fixed';
     amountText = variant?.baseAmount != null ? formatAmount(variant.baseAmount, decimals) : '';
     priceText = variant ? (variant.price / 100).toFixed(2) : '';
-    costText = variant?.cost != null ? String(variant.cost / 100) : '';
+    costText = variant?.extraCost != null ? String(variant.extraCost / 100) : '';
   });
 
   const parsed = $derived(parseVariantForm({ label, kind, amountText, priceText, costText }, decimals, siblings, variant?.id));
@@ -99,12 +99,15 @@
         {#if errors.price}<p class="error">{errors.price}</p>{/if}
       </div>
       <div class="field">
-        <label for="v-cost">Cost (optional)</label>
-        <input id="v-cost" class="input" bind:value={costText} inputmode="decimal" placeholder="Unknown" autocomplete="off" />
-        {#if errors.cost}<p class="error">{errors.cost}</p>{/if}
+        <label for="v-cost">Extra cost (optional)</label>
+        <input id="v-cost" class="input" bind:value={costText} inputmode="decimal" placeholder="€0" autocomplete="off" />
+        {#if errors.extraCost}<p class="error">{errors.extraCost}</p>{/if}
       </div>
     </div>
 
+    <p class="hint">
+      Cost = the product's average cost × what one {kind === 'fixed' ? 'item' : unitName} holds + this extra (packaging, labels…).
+    </p>
     {#if parsed.value}
       <p class="hint">
         {#if parsed.value.kind === 'fixed' && parsed.value.baseAmount !== null}

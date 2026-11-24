@@ -46,8 +46,10 @@ export interface Variant extends Stamped {
   baseAmount: Scaled | null;
   /** Fixed: cents per item. Variable: cents per 1 base unit. */
   price: Cents;
-  /** Same basis as price; null = unknown. */
+  /** Full cost typed by hand (same basis as price); used only while the class has no average cost. Null = none. */
   cost: UnitCost | null;
+  /** Extra cost of this variant on top of its content (packaging…), same basis as price; absent = none (D-040). */
+  extraCost?: UnitCost | null;
   sortOrder: number;
   archived: boolean;
 }

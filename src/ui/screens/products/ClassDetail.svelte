@@ -23,7 +23,7 @@
   import { formatAmount, parseAmount } from '../../../core/quantity.ts';
   import { allGroups, fullName, normalizeGroup } from '../../../core/groups.ts';
   import type { CustomField, Decimals, ProductClass, Variant } from '../../../core/types.ts';
-  import { fieldKey, moveVariant, priceLabel, sortedVariants, validateClassName, type VariantValue } from './logic.ts';
+  import { costLabel, fieldKey, moveVariant, priceLabel, sortedVariants, validateClassName, type VariantValue } from './logic.ts';
   import { inputsSummary, recipesMaking, recipesUsing } from './tree.ts';
 
   let { params = {}, query = {} }: { params?: Record<string, string>; query?: Record<string, string> } = $props();
@@ -154,7 +154,7 @@
       await saveVariants(list.map((v) => (v.id === id ? stampVariant({ ...v, ...value }) : v)));
     } else {
       const sortOrder = Math.max(0, ...list.map((v) => v.sortOrder)) + 1;
-      const v = stampVariant({ id: newId(), ...value, sortOrder, archived: false, createdAt: '', updatedAt: '', updatedBy: '' });
+      const v = stampVariant({ id: newId(), ...value, cost: null, sortOrder, archived: false, createdAt: '', updatedAt: '', updatedBy: '' });
       await saveVariants([...list, v]);
     }
   }
@@ -373,7 +373,7 @@
                   {v.kind === 'fixed' && v.baseAmount !== null
                     ? formatAmount(v.baseAmount, stored.unit.decimals, stored.unit.name)
                     : `by ${stored.unit.name}`}
-                  · {priceLabel(v, stored.unit.name)}{v.price === 0 ? ' (free)' : ''} · cost {v.cost === null ? '—' : formatUnitCost(v.cost)}
+                  · {priceLabel(v, stored.unit.name)}{v.price === 0 ? ' (free)' : ''} · cost {costLabel(v, view.snapshot.get(stored.id)?.avgCost ?? null, stored.unit.decimals, stored.unit.name)}{v.extraCost ? ` (incl. ${formatUnitCost(v.extraCost)} extra)` : ''}
                 </span>
               </button>
               {#if v.price === 0}<Tag>free</Tag>{/if}
