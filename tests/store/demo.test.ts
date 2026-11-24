@@ -136,6 +136,23 @@ describe('demoRecords: prices and costs', () => {
     expect(clientsWithDiscount.length).toBeGreaterThan(0);
   });
 
+  it('sale costs follow the app: the variant cost, else the class average; unknown only for stock added without a cost', () => {
+    const chestnut = named('Honey - Chestnut - 500g Jar');
+    expect(stock.some((e) => e.type === 'add' && e.classId === chestnut.id && e.unitCost === null)).toBe(true);
+    const lines = live.flatMap((o) => o.lines);
+    expect(lines.filter((l) => l.unitCost === null).every((l) => l.classId === chestnut.id)).toBe(true);
+    const small = named('Candles - Small candle');
+    expect(small.variants.every((v) => v.cost === null)).toBe(true);
+    const smallCosts = lines.filter((l) => l.classId === small.id).map((l) => l.unitCost!);
+    expect(smallCosts.length).toBeGreaterThan(0);
+    expect(smallCosts.every((c) => c > 0 && c < small.variants[0].price)).toBe(true);
+  });
+
+  it('keeps by-products in proportion: whey stock stays small', () => {
+    const snap = stockSnapshot(products, orders, stock, purchases);
+    expect(snap.get(named('Dairy - Cheese - Whey').id)!.stock).toBeLessThan(80);
+  });
+
   it('has sales lines with an unknown cost, but most with a known one', () => {
     const lines = live.flatMap((o) => o.lines);
     const unknown = lines.filter((l) => l.unitCost === null).length;
@@ -160,7 +177,7 @@ describe('demoRecords: prices and costs', () => {
     expect(new Set(transforms.flatMap((t) => (t.costs?.labour ?? []).map((l) => l.levelId)))).toEqual(new Set(levels.map((l) => l.id)));
     expect(transforms.filter((t) => t.costs?.mode === 'total').length).toBeGreaterThanOrEqual(1);
     const two = transforms.find((t) => t.outputs.length === 2)!;
-    expect(two.costs!.allocation.map((s) => s.share)).toEqual([0.8, 0.2]);
+    expect(two.costs!.allocation.map((s) => s.share)).toEqual([0.95, 0.05]);
     expect(transforms.filter((t) => t.voided)).toHaveLength(1);
   });
 });

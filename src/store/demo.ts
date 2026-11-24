@@ -2,6 +2,7 @@
 // Orders follow each client's rhythm and the seasons; stock is made or bought just in time, so it only runs out where a case says so.
 import { buildTransformCosts, labourCosts } from '../core/costs.ts';
 import { fullName } from '../core/groups.ts';
+import { saleUnitCost } from '../core/orders.ts';
 import { perBaseUnit } from '../core/stock.ts';
 import {
   RECORD_SCHEMA,
@@ -46,10 +47,10 @@ const SEASON = [0.8, 0.8, 0.9, 1, 1.1, 1, 0.85, 0.6, 1, 1.1, 1.25, 1.7];
 // Policy: now = paid at once, later = monthly payment of what is owed, instal = half now and the rest in instalments,
 // slow = nothing paid in the last 120 days, never = never pays, credit = pays advances that cover the orders.
 const CLIENTS: [string, string, string[], number, number, number, string, Policy, boolean?][] = [
-  ['Marta', '+34 600 111 222', ['family'], 450, 0, 9, 'f5 r1 pol comb mk y4 lav', 'now', true],
+  ['Marta', '+34 600 111 222', ['family'], 450, 0, 9, 'f5 r1 pol comb mk y4 lav ch5', 'now', true],
   ['Lucía', '+34 611 222 333', ['neighbour'], 448, 2, 12, 'f5 o5 fc chw comb', 'later', true],
   ['Javier', '', ['work'], 440, 5, 16, 'r5 r1 cho pl', 'instal'],
-  ['Ana', '', [], 445, 0, 10, 'f1 mk y1 fc but', 'now'],
+  ['Ana', '', [], 445, 0, 10, 'f1 mk y1 fc but wh', 'now'],
   ['Pedro', '+34 622 333 444', [], 450, 1, 11, 'r1 comb mbf stk', 'slow'],
   ['Carmen', '', ['family'], 430, 0, 14, 'pol f5 kef but', 'credit', true],
   ['Luis', '', [], 420, 3, 18, 'f5 h5 lav o1', 'later', true],
@@ -76,10 +77,10 @@ const CLIENTS: [string, string, string[], number, number, number, string, Policy
   ['Tienda Ecológica Luna', '+34 655 000 222', ['shop'], 420, 1, 10, 'f5 f1 o5 o1 pol prop wh', 'later'],
   ['Rocío', '', ['neighbour'], 350, 0, 13, 'y1 y4 mk fc wh', 'now'],
   ['Manuel', '+34 644 555 666', ['work'], 330, 6, 17, 'stk mbf mb5 cho', 'instal'],
-  ['Nuria', '', ['market'], 450, 2, 12, 'lav f5 h5 pol', 'now', true],
+  ['Nuria', '', ['market'], 450, 2, 12, 'lav f5 h5 pol ch5', 'now', true],
   ['Jorge', '', [], 250, 0, 21, 'mk dz', 'now'],
   ['Paula', '+34 699 888 777', ['family'], 180, 0, 10, 'y4 fc but kef', 'credit'],
-  ['Hotel Mirador', '+34 655 000 333', ['restaurant'], 380, 0, 8, 'lam stk chw sau mk but', 'instal'],
+  ['Hotel Mirador', '+34 655 000 333', ['restaurant'], 380, 0, 8, 'lam stk chw sau mk but wh', 'instal'],
   ['Eva', '', ['work'], 120, 0, 15, 'h5 cl o5', 'now', true],
 ];
 const RENAMED = { client: 'Maricarmen López', oldName: 'Mari Carmen', since: 60 };
@@ -140,6 +141,7 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
   const h5 = jar('Heather', '500g Jar', 'h5', '500 g', 1250, 555, 10, 'Autumn');
   const h1 = jar('Heather', '1kg Jar', 'h1', '1 kg', 2200, 1070, 8, 'Autumn');
   const lavender = product('Honey/Lavender', '500g Jar', 'jar', 0, 10, true, [['lav', '500 g', 1, 1100, 520]], { ...harvest('Summer'), archived: true, notes: 'No longer made.' });
+  const chestnut = product('Honey/Chestnut', '500g Jar', 'jar', 0, 6, true, [['ch5', '500 g', 1, 1000, null]], { notes: "From a neighbour's hives; no cost known." });
   const packaging = (name: string, low: number) => product('Packaging', name, 'pcs', 0, low, false);
   const emptyJar5 = packaging('Empty jar 500g', 30);
   const emptyJar1 = packaging('Empty jar 1kg', 20);
@@ -157,7 +159,7 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
   const curedCheese = product('Dairy/Cheese', 'Cured cheese', 'kg', 3, 2000, true, [['chw', 'By weight', null, 1800, 900], ['chq', 'Quarter 750 g', 750, 1350, 700]], {
     customFields: [{ key: 'cure', label: 'Cure (months)', type: 'number' }], customValues: { cure: 6 },
   });
-  const whey = product('Dairy/Cheese', 'Whey', 'L', 0, 10, true, [['wh', '1 L', 1, 150, 60]], { notes: 'Made with the cured cheese.' });
+  const whey = product('Dairy/Cheese', 'Whey', 'L', 0, 10, true, [['wh', '1 L', 1, 150, null]], { notes: 'Made with the cured cheese.' });
   const freshCheese = product('Dairy/Cheese', 'Fresh cheese', 'pcs', 0, 6, true, [['fc', '250 g', 1, 350, 160]]);
   const yogurt = product('Dairy/Yogurt', 'Natural yogurt', 'pot', 0, 10, true, [['y1', 'Single', 1, 90, 40], ['y4', 'Pack of 4', 4, 320, 160]]);
   const butter = product('Dairy/Butter', 'Butter', 'pcs', 0, 8, true, [['but', '250 g', 1, 480, 260]]);
@@ -168,7 +170,8 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
   const minced = product('Meat/Beef', 'Minced beef', 'kg', 3, 2000, true, [['mbf', 'By weight', null, 1300, 850], ['mb5', '500 g pack', 500, 700, 430]]);
   const steak = product('Meat/Beef', 'Steak', 'kg', 3, 1000, true, [['stk', 'By weight', null, 2600, 1700]]);
   const lamb = product('Meat/Lamb', 'Lamb chops', 'kg', 3, 1500, true, [['lam', 'By weight', null, 2400, 1600]]);
-  const candle = product('Candles', 'Beeswax candle', 'pcs', 0, 10, true, [['cs', 'Small', 1, 650, null], ['cl', 'Large', 1, 1450, 820]]);
+  const smallCandle = product('Candles', 'Small candle', 'pcs', 0, 10, true, [['cs', 'Beeswax', 1, 650, null]]);
+  const largeCandle = product('Candles', 'Large candle', 'pcs', 0, 6, true, [['cl', 'Beeswax', 1, 1450, null]]);
   const propolis = product('Wellness', 'Propolis tincture', 'pcs', 0, 5, true, [['prop', '30 ml', 1, 1200, 600]]);
   const eggs = product('Eggs', 'Eggs', 'egg', 0, 24, true, [['dz', 'Dozen', 12, 360, 220], ['hd', 'Half dozen', 6, 190, null], ['dzt', 'Tray of 30', 30, 850, 520, true]]);
   const raw = (name: string, unit: string, decimals: Decimals, low: number) => product('Raw materials', name, unit, decimals, low, false);
@@ -218,30 +221,30 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
   maker(fill('h5', 'Heather', '500g', heatherBulk, emptyJar5, h5, 500, 2), 24);
   maker(fill('h1', 'Heather', '1kg', heatherBulk, emptyJar1, h1, 1000, 3), 12);
   maker(recipe('box', 'Christmas box', [[f5, 1], [r1, 1], [giftBox, 1]], [[xmasBox, 1]], [['Ribbon', 60]], [[L2, 5]]), 6);
-  const deluxe = recipe('deluxe', 'Deluxe gift box', [[h5, 1], [candle, 1], [giftBox, 1]], [[xmasBox, 1]], [['Ribbon', 60]], [[L2, 6]]);
-  const candleL = recipe('candle-l', 'Make large candle', [[beeswax, 250], [wick, 30], [labels, 1]], [[candle, 1]], [['Electricity', 15]], [[L2, 20]]);
-  maker(candleL, 15);
-  recipe('candle-s', 'Make small candle', [[beeswax, 90], [wick, 20], [labels, 1]], [[candle, 1]], [['Electricity', 8]], [[L2, 8]]);
-  maker(recipe('butter', 'Make butter', [[rawMilk, 20], [butterPaper, 4]], [[butter, 4]], [['Salt', 30], ['Electricity', 30]], [[L2, 45]]), 3);
+  const deluxe = recipe('deluxe', 'Deluxe gift box', [[h5, 1], [largeCandle, 1], [giftBox, 1]], [[xmasBox, 1]], [['Ribbon', 60]], [[L2, 6]]);
+  const candleL = recipe('candle-l', 'Make large candle', [[beeswax, 250], [wick, 30], [labels, 1]], [[largeCandle, 1]], [['Electricity', 15]], [[L2, 20]]);
+  maker(candleL, 10);
+  maker(recipe('candle-s', 'Make small candle', [[beeswax, 90], [wick, 20], [labels, 1]], [[smallCandle, 1]], [['Electricity', 8]], [[L2, 8]]), 20);
+  maker(recipe('butter', 'Make butter', [[rawMilk, 10], [butterPaper, 4]], [[butter, 4]], [['Salt', 30], ['Electricity', 30]], [[L2, 15]]), 3);
   maker(recipe('kefir', 'Make kefir', [[rawMilk, 1], [kefirBottle, 2]], [[kefir, 2]], [['Cultures', 25]], [[L1, 6]]), 10);
-  maker(recipe('sausage', 'Make sausages', [[porkShoulder, 5000], [casing, 400]], [[sausages, 4500]], [['Spices', 600], ['Electricity', 40]], [[L3, 75]]), 1);
-  maker(recipe('eggs', 'Pack eggs', [[looseEggs, 12], [eggBox, 1]], [[eggs, 12]], [['Label', 5]], [[L1, 3]]), 10);
-  maker(recipe('cheese', 'Make cured cheese and whey', [[rawMilk, 10]], [[curedCheese, 1000], [whey, 8]], [['Rennet & salt', 150]], [[L3, 40]], [0.8, 0.2]), 6);
+  maker(recipe('sausage', 'Make sausages', [[porkShoulder, 10000], [casing, 800]], [[sausages, 9000]], [['Spices', 1200], ['Electricity', 40]], [[L3, 60]]), 1);
+  maker(recipe('eggs', 'Pack eggs', [[looseEggs, 12], [eggBox, 1]], [[eggs, 12]], [['Label', 5]], [[L1, 2]]), 10);
+  maker(recipe('cheese', 'Make cured cheese and whey', [[rawMilk, 10]], [[curedCheese, 1000], [whey, 1]], [['Rennet & salt', 150]], [[L3, 8]], [0.95, 0.05]), 6);
   maker(recipe('fresh', 'Make fresh cheese', [[rawMilk, 2]], [[freshCheese, 1]], [['Salt', 5]], [[L1, 4]]), 12);
   maker(recipe('bottle', 'Bottle milk', [[rawMilk, 1]], [[bottle, 1]], [['Bottle', 40]], [[L1, 1]]), 30);
   maker(recipe('yogurt', 'Make yogurt', [[rawMilk, 1]], [[yogurt, 8]], [['Cultures', 20], ['Pots', 80]], [[L1, 10]]), 4);
 
   // Bought classes: supplier, lot size and cost per base unit at the start (prices rise 5 % every 150 days).
-  const sources = new Map<string, { from: Supplier; lot: number; cost: number }>();
-  const source = (c: ProductClass, from: Supplier, lot: number, cost: number) => sources.set(c.id, { from, lot, cost });
+  const sources = new Map<string, { from: Supplier | null; lot: number; cost: number }>();
+  const source = (c: ProductClass, from: Supplier | null, lot: number, cost: number) => sources.set(c.id, { from, lot, cost });
   source(flowerBulk, apicola, 40000, 650); source(rosemaryBulk, apicola, 30000, 800); source(oakBulk, apicola, 25000, 900); source(heatherBulk, apicola, 25000, 1000);
   source(lavender, apicola, 24, 520); source(comb, apicola, 8000, 2000); source(pollen, apicola, 24, 250); source(propolis, apicola, 12, 600);
   source(beeswax, apicola, 5000, 2200); source(wick, apicola, 1000, 90);
   source(emptyJar5, envases, 200, 35); source(emptyJar1, envases, 120, 50); source(lid, envases, 300, 12); source(giftBox, envases, 30, 150);
-  source(butterPaper, envases, 100, 8); source(kefirBottle, envases, 100, 45); source(eggBox, envases, 100, 15); source(casing, envases, 2000, 150);
-  source(labels, imprenta, 500, 6); source(rawMilk, granja, 300, 45); source(looseEggs, granja, 360, 18);
+  source(butterPaper, envases, 100, 8); source(kefirBottle, envases, 100, 45); source(eggBox, envases, 100, 15); source(casing, envases, 2000, 15);
+  source(chestnut, null, 24, 0); source(labels, imprenta, 500, 6); source(rawMilk, granja, 300, 45); source(looseEggs, granja, 360, 15);
   source(chorizo, carnes, 30, 380); source(porkLoin, carnes, 10000, 700); source(minced, carnes, 10000, 850); source(steak, carnes, 6000, 1700);
-  source(lamb, carnes, 10000, 1600); source(porkShoulder, carnes, 20000, 600);
+  source(lamb, carnes, 10000, 1600); source(porkShoulder, carnes, 20000, 450);
   const costOn = (c: { cost: number }, days: number) => Math.round(c.cost * (1 + 0.05 * Math.floor((DEMO_DAYS - days) / 150)));
 
   // ---------- simulation state ----------
@@ -283,7 +286,17 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
     basket = new Map();
   };
   const buy = (c: ProductClass, amount: number) => {
-    const cost = costOn(sources.get(c.id)!, day);
+    const src = sources.get(c.id)!;
+    if (!src.from) {
+      // Given, not bought: added to stock without a cost, so its sales have an unknown cost.
+      incoming(c.id, amount, null);
+      stock.push({
+        ...stamp(at(date, 6, 30 + n.buy++)), id: `demo-stock-${pad(stock.length + 1)}`, date, type: 'add', classId: c.id, amount,
+        unitCost: null, reason: '', note: "From a neighbour's hives", voided: false,
+      });
+      return;
+    }
+    const cost = costOn(src, day);
     incoming(c.id, amount, cost);
     addLine(sources.get(c.id)!.from, c, amount, roundDiv(amount * cost, 10 ** c.unit.decimals));
   };
@@ -371,12 +384,14 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
       oversold = true;
       amount = Math.max(bal.get(cls.id) ?? 0, 0) + 600;
     } else ensure(cls.id, amount);
+    // Cost like the app: the variant cost, else the class average of the day (§3.6b).
+    const unitCost = saleUnitCost(v, avg.get(cls.id) ?? null, cls.unit.decimals);
     outgoing(cls.id, amount);
     let unitPrice = day > PRICE_RISE_DAYS ? Math.round((v.price * OLD_PRICE) / 10) * 10 : v.price;
     if (restaurant && !fixed) unitPrice = Math.round(unitPrice * RESTAURANT_DISCOUNT);
     return {
       lineId: `${orderId}-l${j + 1}`, classId: cls.id, variantId: v.id, className: fullName(cls), variantLabel: v.label, kind: v.kind,
-      unitName: cls.unit.name, decimals: cls.unit.decimals, quantity, amount, unitPrice, unitCost: v.cost,
+      unitName: cls.unit.name, decimals: cls.unit.decimals, quantity, amount, unitPrice, unitCost,
       lineTotal: fixed ? quantity! * unitPrice : roundDiv(amount * unitPrice, 10 ** cls.unit.decimals),
     };
   };
@@ -484,7 +499,7 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
     if (day === 380) remove(f5, 2, 'waste', 'Two jars broke at the market');
     if (day === 300) remove(pollen, 1, 'gift');
     if (day === 200) remove(bottle, 3, 'own use');
-    if (day === 120) remove(candle, 1, 'Market sample');
+    if (day === 120) remove(smallCandle, 1, 'Market sample');
     if (day === 90) remove(lid, 5, 'count correction');
     if (day === 0) {
       // Today ends with propolis sold out (stock count) and the rosemary 1kg jar low after breakage.
