@@ -1,4 +1,5 @@
 // Demo mode sample data (spec §2.1, §15): deterministic records relative to `today`, loaded without outbox.
+import { fullName } from '../core/groups.ts';
 import { buildTransformCosts, labourCosts } from '../core/costs.ts';
 import {
   SCHEMA_VERSION,
@@ -180,7 +181,7 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
     const rows = lines.map(([cls, amount, cost], j): PurchaseLine => {
       if (cls.trackStock) unitCost.set(cls.id, cost);
       return {
-        lineId: `demo-purchase-${purchases.length + 1}-l${j + 1}`, classId: cls.id, className: cls.group ? `${cls.group}/${cls.name}` : cls.name,
+        lineId: `demo-purchase-${purchases.length + 1}-l${j + 1}`, classId: cls.id, className: fullName(cls),
         unitName: cls.unit.name, decimals: cls.unit.decimals, amount, lineTotal: roundDiv(amount * cost, 10 ** cls.unit.decimals),
       };
     });
