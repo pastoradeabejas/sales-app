@@ -10,7 +10,6 @@ import {
   costsFromForm,
   dayLabel,
   daysLeftText,
-  editRow,
   equalPercents,
   movementLabel,
   movePreview,
@@ -19,7 +18,6 @@ import {
   reasonLabel,
   reasonValue,
   recentMovements,
-  rowsFromList,
   sharesToPercents,
   toInputText,
   transformSummary,
@@ -73,7 +71,6 @@ const yogurt = cls('yog', 'Yogurt', 0, 'pcs');
 const cheese = cls('chz', 'Parmigiano', 3, 'kg');
 const whey = cls('whey', 'Whey', 3, 'kg', { sellable: false });
 const byId = new Map([milk, yogurt, cheese, whey].map((c) => [c.id, c]));
-const dec = (id: string) => byId.get(id)!.unit.decimals;
 
 describe('movePreview', () => {
   it('adds and removes from the current stock', () => {
@@ -110,42 +107,6 @@ describe('toInputText', () => {
     expect(toInputText(10000, 0)).toBe('10000');
     expect(toInputText(1500250, 3)).toBe('1500.25');
     expect(toInputText(500000, 3)).toBe('500');
-  });
-});
-
-describe('transform rows', () => {
-  const recipe = () => [...rowsFromList([{ classId: 'milk', amount: 500000 }], dec), ...rowsFromList([{ classId: 'yog', amount: 10000 }], dec)];
-
-  it('rows from a recipe are linked to their base amount', () => {
-    expect(recipe()).toEqual([
-      { classId: 'milk', text: '500', base: 500000 },
-      { classId: 'yog', text: '10000', base: 10000 },
-    ]);
-  });
-  it('changing a linked row scales the others and unlinks the edited one', () => {
-    const rows = editRow(recipe(), 0, '750', dec);
-    expect(rows).toEqual([
-      { classId: 'milk', text: '750', base: null },
-      { classId: 'yog', text: '15000', base: 10000 },
-    ]);
-  });
-  it('a row edited by hand is no longer overwritten by scaling', () => {
-    let rows = editRow(recipe(), 0, '750', dec);
-    rows = editRow(rows, 1, '14800', dec);
-    expect(rows[1]).toEqual({ classId: 'yog', text: '14800', base: null });
-    rows = editRow(rows, 0, '1000', dec);
-    expect(rows.map((r) => r.text)).toEqual(['1000', '14800']);
-  });
-  it('scaling rounds each row to its class decimals', () => {
-    const rows = [...rowsFromList([{ classId: 'milk', amount: 1000000 }], dec), ...rowsFromList([{ classId: 'chz', amount: 90000 }, { classId: 'whey', amount: 850000 }], dec)];
-    expect(editRow(rows, 0, '333', dec).map((r) => r.text)).toEqual(['333', '29.97', '283.05']);
-  });
-  it('an invalid amount does not scale', () => {
-    expect(editRow(recipe(), 0, 'abc', dec)[1].text).toBe('10000');
-  });
-  it('manual rows (no base) never scale', () => {
-    const rows = [{ classId: 'milk', text: '1', base: null }, { classId: 'yog', text: '5', base: null }];
-    expect(editRow(rows, 0, '2', dec)[1].text).toBe('5');
   });
 });
 

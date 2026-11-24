@@ -3,8 +3,8 @@
   import Icon from '../../components/Icon.svelte';
   import Sheet from '../../components/Sheet.svelte';
   import { sharesValid } from '../../../core/costs.ts';
-  import { parseMoney } from '../../../core/money.ts';
-  import { parseAmount } from '../../../core/quantity.ts';
+    import { formatAmount, parseAmount } from '../../../core/quantity.ts';
+  import { formatMoney, parseMoney } from '../../../core/money.ts';
   import { validateTransform } from '../../../core/stock.ts';
   import { fullName } from '../../../core/groups.ts';
   import { pickerGroups } from '../products/tree.ts';
@@ -13,13 +13,15 @@
   import { showToast } from '../../toast.svelte.ts';
   import { cap, equalPercents, percentsToShares, recipeNameError, sharesToPercents, stepAmount, toInputText } from './logic.ts';
 
-  // Create or edit a recipe (§3.6a): name, 1-5 inputs and outputs, default extras and output shares.
+  // New recipe (§3.6a): name, 1-5 inputs and outputs, default extras and output shares.
+  // Recipes are never edited (D-019): with `recipe` the sheet only shows it, with Archive.
   // `initialOutput` prefills a new recipe's single output (from a product page, D-015).
   let {
     open = $bindable(false),
     recipe = null,
     initialOutput,
-  }: { open: boolean; recipe?: Recipe | null; initialOutput?: ClassAmount } = $props();
+    onsaved,
+  }: { open: boolean; recipe?: Recipe | null; initialOutput?: ClassAmount; onsaved?: (r: Recipe) => void } = $props();
 
   type Row = { classId: string; text: string };
   const MAX_ROWS = 5;
@@ -31,6 +33,7 @@
     return c ? fullName(c) : '';
   };
   const toRows = (xs: ClassAmount[]): Row[] => xs.map((x) => ({ classId: x.classId, text: toInputText(x.amount, decimalsOf(x.classId)) }));
+  const amountText = (x: ClassAmount) => formatAmount(x.amount, decimalsOf(x.classId), unitOf(x.classId));
 
   let name = $state('');
   let inputs = $state<Row[]>([]);
@@ -41,13 +44,12 @@
   let archiving = $state(false);
 
   $effect(() => {
-    if (!open) return;
-    const r = recipe;
-    name = r?.name ?? '';
-    inputs = r ? toRows(r.inputs) : [{ classId: '', text: '' }];
-    outputs = r ? toRows(r.outputs) : initialOutput ? toRows([initialOutput]) : [{ classId: '', text: '' }];
-    extras = r ? r.extras.map((x) => ({ label: x.label, text: (x.amount / 100).toFixed(2) })) : [];
-    shareTexts = r && r.shares.length === r.outputs.length ? sharesToPercents(r.shares) : equalPercents(r ? r.outputs.length : 1);
+    if (!open || recipe) return;
+    name = '';
+    inputs = [{ classId: '', text: '' }];
+    outputs = initialOutput ? toRows([initialOutput]) : [{ classId: '', text: '' }];
+    extras = [];
+    shareTexts = equalPercents(1);
     tried = false;
   });
 
@@ -67,7 +69,7 @@
     r.text = toInputText(stepAmount(amountOf(r), decimalsOf(r.classId), dir), decimalsOf(r.classId));
   }
 
-  const nameError = $derived(recipeNameError(name, app.recipes, recipe?.id ?? null));
+  const nameError = $derived(recipeNameError(name, app.recipes, null));
   const built = $derived.by(() => {
     const errors: string[] = [];
     if ([...inputs, ...outputs].some((r) => !r.classId || amountOf(r) === null)) errors.push('Choose a product and an amount on every row.');
@@ -99,10 +101,12 @@
     e.preventDefault();
     tried = true;
     if (nameError || built.errors.length) return;
-    const base = recipe ?? { ...freshRecord(), archived: false };
-    await saveRecipe({ ...base, name: name.trim(), inputs: built.ins, outputs: built.outs, extras: built.extras, shares: built.shares });
-    showToast(recipe ? 'Recipe saved' : 'Recipe added');
+    const r = await saveRecipe({
+      ...freshRecord(), archived: false, name: name.trim(), inputs: built.ins, outputs: built.outs, extras: built.extras, shares: built.shares,
+    });
+    showToast('Recipe added');
     open = false;
+    onsaved?.(r);
   }
 
   async function archive() {
@@ -144,7 +148,34 @@
   {/each}
 {/snippet}
 
-<Sheet bind:open title={recipe ? 'Edit recipe' : 'New recipe'}>
+<Sheet bind:open title={recipe ? recipe.name : 'New recipe'}>
+  {#if recipe}
+    <div class="form">
+      <section class="group">
+        <h3>Uses</h3>
+        {#each recipe.inputs as x (x.classId)}<div class="row-between"><span>{nameOf(x.classId)}</span><b>{amountText(x)}</b></div>{/each}
+      </section>
+      <section class="group">
+        <h3>Makes</h3>
+        {#each recipe.outputs as x, i (x.classId)}
+          <div class="row-between">
+            <span>{nameOf(x.classId)}{#if recipe.outputs.length > 1 && recipe.shares[i]} <span class="muted">· {sharesToPercents(recipe.shares)[i]}% of cost</span>{/if}</span>
+            <b>{amountText(x)}</b>
+          </div>
+        {/each}
+      </section>
+      {#if recipe.extras.length}
+        <section class="group">
+          <h3>Default extras</h3>
+          {#each recipe.extras as x, i (i)}<div class="row-between"><span>{x.label}</span><b>{formatMoney(x.amount)}</b></div>{/each}
+        </section>
+      {/if}
+      <p class="hint">Recipes can't be changed. For a different transform, create a new recipe.</p>
+      {#if !recipe.archived}
+        <button type="button" class="btn btn-danger btn-block" onclick={() => (archiving = true)}>Archive recipe</button>
+      {/if}
+    </div>
+  {:else}
   <form id="recipe-form" class="form" onsubmit={save} novalidate>
     <div class="field">
       <label for="r-name">Name</label>
@@ -205,10 +236,8 @@
     {/if}
 
     <button type="submit" class="btn btn-primary btn-block">Save recipe</button>
-    {#if recipe}
-      <button type="button" class="btn btn-danger btn-block" onclick={() => (archiving = true)}>Archive recipe</button>
-    {/if}
   </form>
+  {/if}
 </Sheet>
 
 <ConfirmSheet bind:open={archiving} title="Archive recipe?" confirmLabel="Archive" danger onconfirm={archive}>

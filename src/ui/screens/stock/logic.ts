@@ -2,8 +2,7 @@
 import { buildTransformCosts, sharesValid } from '../../../core/costs.ts';
 import { formatUnitCost, parseMoney } from '../../../core/money.ts';
 import { fullName } from '../../../core/groups.ts';
-import { formatAmount, parseAmount } from '../../../core/quantity.ts';
-import { scaleRows } from '../../../core/recipes.ts';
+import { formatAmount } from '../../../core/quantity.ts';
 import { daysLeft, type Movement } from '../../../core/stock.ts';
 import type { ClassAmount, CostShare, Decimals, Id, Order, ProductClass, Scaled, StockEvent, TransformCosts } from '../../../core/types.ts';
 
@@ -39,36 +38,6 @@ export function toInputText(scaled: Scaled, decimals: Decimals): string {
 }
 
 /** A transform form row; `base` is the recipe amount while the row is still linked to scaling. */
-export interface TRow {
-  classId: Id;
-  text: string;
-  base: Scaled | null;
-}
-
-export function rowsFromList(list: ClassAmount[], decimalsOf: (id: Id) => Decimals): TRow[] {
-  return list.map((x) => ({ classId: x.classId, text: toInputText(x.amount, decimalsOf(x.classId)), base: x.amount }));
-}
-
-/**
- * Hand edit of one row: that row is unlinked; if it was linked and the amount is valid,
- * every still-linked row is scaled from its recipe base by the same factor (§3.6a).
- */
-export function editRow(rows: TRow[], index: number, text: string, decimalsOf: (id: Id) => Decimals): TRow[] {
-  const edited = rows[index];
-  const out = rows.map((r, i) => (i === index ? { ...r, text, base: null } : r));
-  const amount = parseAmount(text, decimalsOf(edited.classId));
-  if (edited.base === null || amount === null) return out;
-  const linked = out.map((r, i) => ({ r, i })).filter(({ r }) => r.base !== null);
-  const scaled = scaleRows(
-    [{ classId: edited.classId, amount }, ...linked.map(({ r }) => ({ classId: r.classId, amount: r.base! }))],
-    [{ classId: edited.classId, amount: edited.base }, ...linked.map(({ r }) => ({ classId: r.classId, amount: r.base! }))],
-    { index: 0, amount },
-    decimalsOf,
-  );
-  linked.forEach(({ r, i }, k) => (out[i] = { ...r, text: toInputText(scaled[k + 1], decimalsOf(r.classId)) }));
-  return out;
-}
-
 const pctText = (hundredths: number) => String(hundredths / 100);
 
 /** Equal shares in percent text, 2 decimals, the last one taking the remainder. */

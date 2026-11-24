@@ -6,103 +6,86 @@
   import Icon from '../../components/Icon.svelte';
   import Segmented from '../../components/Segmented.svelte';
   import { averageCostAt, materialsCost, otherDifference, outputUnitCosts } from '../../../core/costs.ts';
-  import { fullName } from '../../../core/groups.ts';
   import { formatMoney, formatUnitCost } from '../../../core/money.ts';
   import { formatAmount, parseAmount } from '../../../core/quantity.ts';
-  import { recipeYield } from '../../../core/recipes.ts';
+  import { batch, parseBatches } from '../../../core/recipes.ts';
   import { stockWarnings, validateTransform } from '../../../core/stock.ts';
-  import type { ClassAmount, Decimals, Recipe } from '../../../core/types.ts';
-  import { app, freshRecord, localDate, saveRecipe, saveStockEvent, view } from '../../data.svelte.ts';
-  import { groupedOptions, liveName } from './grouping.ts';
+  import type { ClassAmount, Decimals } from '../../../core/types.ts';
+  import { app, freshRecord, localDate, saveStockEvent, view } from '../../data.svelte.ts';
+  import { liveName } from './grouping.ts';
   import { go } from '../../router.svelte.ts';
   import { showToast } from '../../toast.svelte.ts';
+  import RecipeSheet from './RecipeSheet.svelte';
   import {
     cap,
     costsFromForm,
-    editRow,
     equalPercents,
     movePreview,
-    rowsFromList,
     sharesToPercents,
     stepAmount,
     toInputText,
     activeRecipes,
     transformSummary,
     type CostForm,
-    type TRow,
   } from './logic.ts';
 
+  // Transform runs a saved recipe a whole number of times (D-019): inputs follow the recipe,
+  // outputs start at recipe × batches and can be corrected to the real yield.
   let { query = {} }: { params?: Record<string, string>; query?: Record<string, string> } = $props();
 
-  const MAX_ROWS = 5;
-  const classes = $derived(app.products.filter((c) => c.trackStock && !c.archived).sort((a, b) => a.name.localeCompare(b.name)));
-  const recipes = $derived(activeRecipes(app.recipes));
+  // From a stock page (?input=), recipes using that product come first.
+  const recipes = $derived.by(() => {
+    const all = activeRecipes(app.recipes);
+    const uses = (r: (typeof all)[number]) => r.inputs.some((x) => x.classId === query.input);
+    return query.input ? [...all.filter(uses), ...all.filter((r) => !uses(r))] : all;
+  });
   const decimalsOf = (id: string): Decimals => view.classesById.get(id)?.unit.decimals ?? 0;
-  const emptyRow = (classId = ''): TRow => ({ classId, text: '', base: null });
 
   let recipeId = $state('');
-  let inputs = $state<TRow[]>([emptyRow(untrack(() => query.input ?? ''))]);
-  let outputs = $state<TRow[]>([emptyRow()]);
+  let batchesText = $state('1');
+  let outTexts = $state<string[]>([]);
   let date = $state(localDate());
   let note = $state('');
-  let saveAs = $state(false);
-  let recipeName = $state('');
   let form = $state<CostForm>({ opened: false, mode: 'breakdown', extras: [], totalText: '', shareTexts: ['100'] });
   let tried = $state(false);
   let confirm = $state(false);
+  let newOpen = $state(false);
 
+  const recipe = $derived(app.recipes.find((r) => r.id === recipeId && !r.archived));
+  const batches = $derived(parseBatches(batchesText));
+  const planned = $derived(recipe && batches ? batch(recipe, batches) : null);
   const centsText = (c: number) => (c / 100).toFixed(2);
 
+  // Outputs and cost extras follow the recipe and batches; hand corrections stay until either changes.
+  function reset() {
+    const r = app.recipes.find((x) => x.id === recipeId && !x.archived);
+    const n = parseBatches(batchesText);
+    if (!r || !n) return;
+    const p = batch(r, n);
+    outTexts = p.outputs.map((o) => toInputText(o.amount, decimalsOf(o.classId)));
+    const shares = r.shares.length === r.outputs.length ? sharesToPercents(r.shares) : equalPercents(r.outputs.length);
+    form = { ...form, extras: p.extras.map((x) => ({ label: x.label, text: centsText(x.amount) })), shareTexts: shares };
+  }
   function useRecipe(id: string) {
     recipeId = id;
-    const r: Recipe | undefined = app.recipes.find((x) => x.id === id);
-    if (!r) {
-      // Manual: keep the rows, stop scaling.
-      inputs = inputs.map((x) => ({ ...x, base: null }));
-      outputs = outputs.map((x) => ({ ...x, base: null }));
-      return;
-    }
-    inputs = rowsFromList(r.inputs, decimalsOf);
-    outputs = rowsFromList(r.outputs, decimalsOf);
-    const shares = r.shares.length === r.outputs.length ? sharesToPercents(r.shares) : equalPercents(r.outputs.length);
-    form = { ...form, extras: r.extras.map((x) => ({ label: x.label, text: centsText(x.amount) })), shareTexts: shares };
-    saveAs = false;
+    batchesText = '1';
+    reset();
   }
   untrack(() => query.recipe && useRecipe(query.recipe));
-
-  function edit(side: 'in' | 'out', i: number, text: string) {
-    const all = editRow([...inputs, ...outputs], side === 'in' ? i : inputs.length + i, text, decimalsOf);
-    inputs = all.slice(0, inputs.length);
-    outputs = all.slice(inputs.length);
+  function setBatches(text: string) {
+    batchesText = text;
+    reset();
   }
-  function stepRow(side: 'in' | 'out', i: number, dir: 1 | -1) {
-    const r = (side === 'in' ? inputs : outputs)[i];
-    const d = decimalsOf(r.classId);
-    edit(side, i, toInputText(stepAmount(amountOf(r), d, dir), d));
-  }
-  function setClass(side: 'in' | 'out', i: number, classId: string) {
-    const rows = side === 'in' ? inputs : outputs;
-    rows[i] = { ...rows[i], classId, base: null };
-  }
-  function addRow(side: 'in' | 'out') {
-    if (side === 'in') inputs.push(emptyRow());
-    else {
-      outputs.push(emptyRow());
-      form.shareTexts = equalPercents(outputs.length);
-    }
-  }
-  function removeRow(side: 'in' | 'out', i: number) {
-    if (side === 'in') inputs.splice(i, 1);
-    else {
-      outputs.splice(i, 1);
-      form.shareTexts = equalPercents(outputs.length);
-    }
+  const stepBatches = (dir: 1 | -1) => setBatches(String(Math.max(1, (batches ?? 1) + dir)));
+  function stepOut(i: number, dir: 1 | -1) {
+    if (!recipe) return;
+    const d = decimalsOf(recipe.outputs[i].classId);
+    outTexts[i] = toInputText(stepAmount(parseAmount(outTexts[i] ?? '', d), d, dir), d);
   }
 
-  const amountOf = (r: TRow) => (r.classId && r.text.trim() ? parseAmount(r.text, decimalsOf(r.classId)) : null);
-  const list = (rows: TRow[]): ClassAmount[] => rows.filter((r) => r.classId).map((r) => ({ classId: r.classId, amount: amountOf(r) ?? 0 }));
-  const ins = $derived(list(inputs));
-  const outs = $derived(list(outputs));
+  const ins = $derived(planned?.inputs ?? []);
+  const outAmounts = $derived((recipe?.outputs ?? []).map((o, i) => parseAmount(outTexts[i] ?? '', decimalsOf(o.classId))));
+  const outs = $derived<ClassAmount[]>((recipe?.outputs ?? []).map((o, i) => ({ classId: o.classId, amount: outAmounts[i] ?? 0 })));
   const stockOf = (id: string) => view.snapshot.get(id)?.stock ?? 0;
   const fmt = (id: string, v: number) => {
     const c = view.classesById.get(id);
@@ -110,14 +93,6 @@
   };
   const unitOf = (id: string) => view.classesById.get(id)?.unit.name ?? '';
   const nameOf = (id: string) => liveName(view.classesById, id, '');
-
-  const yieldText = $derived.by(() => {
-    const i = ins[0];
-    const o = outs[0];
-    if (!i?.amount || !o?.amount) return '';
-    const y = recipeYield(i, o, decimalsOf);
-    return `${String(Number(y.toFixed(2)))} ${unitOf(o.classId)} per ${unitOf(i.classId)}`;
-  });
 
   // Materials at the transform date: current average for today or later, else the average up to that day.
   const today = localDate();
@@ -132,23 +107,21 @@
   const unitCosts = $derived(costResult.costs ? outputUnitCosts(costResult.costs, outs.filter((x) => x.amount > 0), view.classesById) : []);
   const shareSum = $derived(form.shareTexts.reduce((s, t) => s + (Number(t.replace(',', '.')) || 0), 0));
 
-  const rowErrors = $derived(
-    [...inputs, ...outputs].some((r) => !r.classId || amountOf(r) === null) ? 'Choose a product and an amount on every row.' : '',
-  );
-  const errors = $derived([
-    ...(rowErrors ? [rowErrors] : []),
-    ...validateTransform({ inputs: ins, outputs: outs }, view.classesById)
-      .filter((e) => !rowErrors || !e.startsWith('amounts'))
-      .map((e) => `${cap(e)}.`),
-    ...(costResult.error ? [costResult.error] : []),
-    ...(saveAs && !recipeId && !recipeName.trim() ? ['Give the recipe a name.'] : []),
-  ]);
+  const errors = $derived.by(() => {
+    if (!recipe) return ['Choose a recipe.'];
+    if (!batches) return ['Batches must be a whole number from 1.'];
+    if (outAmounts.some((a) => a === null)) return ['Check the amounts made.'];
+    return [
+      ...validateTransform({ inputs: ins, outputs: outs }, view.classesById).map((e) => `${cap(e)}.`),
+      ...(costResult.error ? [costResult.error] : []),
+    ];
+  });
   const warnings = $derived.by(() => {
     const delta = new Map<string, number>();
     for (const x of ins) delta.set(x.classId, (delta.get(x.classId) ?? 0) - x.amount);
     return stockWarnings(delta, view.snapshot);
   });
-  const summary = $derived(transformSummary(ins.filter((x) => x.amount > 0), outs.filter((x) => x.amount > 0), view.classesById));
+  const summary = $derived(transformSummary(ins, outs.filter((x) => x.amount > 0), view.classesById));
 
   function submit(e: SubmitEvent) {
     e.preventDefault();
@@ -160,20 +133,7 @@
 
   async function save() {
     const costs = costResult.costs;
-    let usedRecipe = recipeId || null;
-    if (saveAs && !recipeId) {
-      const r = await saveRecipe({
-        ...freshRecord(),
-        name: recipeName.trim(),
-        inputs: ins,
-        outputs: outs,
-        extras: costs?.mode === 'breakdown' ? costs.extras : [],
-        shares: costs && outs.length > 1 ? costs.allocation : [],
-        archived: false,
-      });
-      usedRecipe = r.id;
-    }
-    await saveStockEvent({ ...freshRecord(), date, type: 'transform', inputs: ins, outputs: outs, recipeId: usedRecipe, costs, note: note.trim(), voided: false });
+    await saveStockEvent({ ...freshRecord(), date, type: 'transform', inputs: ins, outputs: outs, recipeId, costs, note: note.trim(), voided: false });
     showToast(`Transformed: ${summary}`);
     go('#/stock');
   }
@@ -181,11 +141,11 @@
 
 <Header title="Transform" back="#/stock" />
 
-{#if classes.length < 2}
+{#if !recipes.length}
   <div class="page">
-    <EmptyState title="Not enough products track stock">
-      <p>A transform needs at least two products with stock tracking (one used, one made).</p>
-      <a class="btn" href="#/products">Products</a>
+    <EmptyState title="No recipes yet">
+      <p>A transform runs a recipe: what it uses and what it makes. Create one first.</p>
+      <button type="button" class="btn btn-primary" onclick={() => (newOpen = true)}>+ New recipe</button>
     </EmptyState>
   </div>
 {:else}
@@ -193,90 +153,59 @@
     <div class="field">
       <span class="label">Recipe</span>
       <div class="chips" role="group" aria-label="Recipe">
-        <button type="button" class:on={!recipeId} aria-pressed={!recipeId} onclick={() => useRecipe('')}>Manual</button>
         {#each recipes as r (r.id)}
           <button type="button" class:on={recipeId === r.id} aria-pressed={recipeId === r.id} onclick={() => useRecipe(r.id)}>{r.name}</button>
         {/each}
+        <button type="button" class="new" onclick={() => (newOpen = true)}>+ New recipe</button>
       </div>
     </div>
 
-    {#snippet rows(side: 'in' | 'out', items: TRow[])}
-      {#each items as r, i (i)}
-        {@const amount = amountOf(r)}
-        {@const before = stockOf(r.classId)}
-        {@const after = side === 'in' ? before - (amount ?? 0) : movePreview(before, 'add', amount).after}
-        <div class="row">
-          <div class="row-main">
-            <select
-              class="input"
-              aria-label="{side === 'in' ? 'Input' : 'Output'} {i + 1} product"
-              value={r.classId}
-              onchange={(e) => setClass(side, i, e.currentTarget.value)}
-            >
-              <option value="" disabled>Choose…</option>
-              {#each groupedOptions(classes) as g (g.path)}
-                {#if g.path}
-                  <optgroup label={g.path.replaceAll('/', ' - ')}>
-                    {#each g.items as c (c.id)}<option value={c.id}>{fullName(c)}</option>{/each}
-                  </optgroup>
-                {:else}
-                  {#each g.items as c (c.id)}<option value={c.id}>{fullName(c)}</option>{/each}
-                {/if}
-              {/each}
-            </select>
-            <div class="amt">
-              <button type="button" class="step" aria-label="{side === 'in' ? 'Input' : 'Output'} {i + 1} less" onclick={() => stepRow(side, i, -1)}>−</button>
-              <div class="suffix">
-                <input
-                  class="input"
-                  inputmode="decimal"
-                  autocomplete="off"
-                  placeholder="0"
-                  aria-label="{side === 'in' ? 'Input' : 'Output'} {i + 1} amount"
-                  value={r.text}
-                  oninput={(e) => edit(side, i, e.currentTarget.value)}
-                />
-                <span aria-hidden="true">{unitOf(r.classId)}</span>
-              </div>
-              <button type="button" class="step" aria-label="{side === 'in' ? 'Input' : 'Output'} {i + 1} more" onclick={() => stepRow(side, i, 1)}>+</button>
-            </div>
-            {#if items.length > 1}
-              <button type="button" class="icon-btn" aria-label="Remove row {i + 1}" onclick={() => removeRow(side, i)}><Icon name="close" size={18} /></button>
-            {/if}
-          </div>
-          {#if r.classId}
-            <span class="muted" class:owed-text={after < 0}>
-              {#if side === 'in'}
-                In stock {fmt(r.classId, before)} → <b>{fmt(r.classId, after)} left</b>
-              {:else}
-                In stock {fmt(r.classId, before)} → <b>{fmt(r.classId, after)}</b>
-              {/if}
-              {#if r.base !== null}· scales with the recipe{/if}
-            </span>
-          {/if}
+    {#if recipe}
+    <div class="field">
+      <label for="batches">Batches</label>
+      <div class="amt">
+        <button type="button" class="step" aria-label="One batch less" onclick={() => stepBatches(-1)}>−</button>
+        <div class="suffix">
+          <input id="batches" class="input" inputmode="numeric" autocomplete="off" value={batchesText} oninput={(e) => setBatches(e.currentTarget.value)} />
+          <span aria-hidden="true">× recipe</span>
         </div>
-      {/each}
-    {/snippet}
+        <button type="button" class="step" aria-label="One batch more" onclick={() => stepBatches(1)}>+</button>
+      </div>
+    </div>
 
     <section class="card">
-      <div class="section-head">
-        <h2>Uses</h2>
-        <button type="button" class="btn-ghost link" disabled={inputs.length >= MAX_ROWS} onclick={() => addRow('in')}>+ Add input</button>
-      </div>
-      {@render rows('in', inputs)}
+      <h2>Uses</h2>
+      {#each ins as x (x.classId)}
+        {@const before = stockOf(x.classId)}
+        <div class="row">
+          <div class="row-between"><span>{nameOf(x.classId)}</span><b>{fmt(x.classId, x.amount)}</b></div>
+          <span class="muted" class:owed-text={before - x.amount < 0}>In stock {fmt(x.classId, before)} → <b>{fmt(x.classId, before - x.amount)} left</b></span>
+        </div>
+      {/each}
     </section>
 
     <p class="yield" aria-live="polite">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v16M6 14l6 6 6-6"></path></svg>
-      <span>{yieldText || (recipeId ? 'Amounts scale together' : 'Manual: set each amount by hand')}</span>
+      <span>{batches ? `${batches} × ${recipe.name}` : 'Set the batches'}</span>
     </p>
 
     <section class="card">
-      <div class="section-head">
-        <h2>Makes</h2>
-        <button type="button" class="btn-ghost link" disabled={outputs.length >= MAX_ROWS} onclick={() => addRow('out')}>+ Add output</button>
-      </div>
-      {@render rows('out', outputs)}
+      <h2>Makes</h2>
+      {#each recipe.outputs as o, i (o.classId)}
+        {@const before = stockOf(o.classId)}
+        <div class="row">
+          <span>{nameOf(o.classId)}</span>
+          <div class="amt">
+            <button type="button" class="step" aria-label="Output {i + 1} less" onclick={() => stepOut(i, -1)}>−</button>
+            <div class="suffix">
+              <input class="input" inputmode="decimal" autocomplete="off" placeholder="0" aria-label="Output {i + 1} amount" bind:value={outTexts[i]} />
+              <span aria-hidden="true">{unitOf(o.classId)}</span>
+            </div>
+            <button type="button" class="step" aria-label="Output {i + 1} more" onclick={() => stepOut(i, 1)}>+</button>
+          </div>
+          <span class="muted">In stock {fmt(o.classId, before)} → <b>{fmt(o.classId, movePreview(before, 'add', outAmounts[i]).after)}</b> · change it if the real yield differs</span>
+        </div>
+      {/each}
     </section>
 
     <details class="card costs" ontoggle={(e) => e.currentTarget.open && (form.opened = true)}>
@@ -357,19 +286,6 @@
       </div>
     </details>
 
-    {#if !recipeId}
-      <label class="check">
-        <input type="checkbox" bind:checked={saveAs} />
-        Save these amounts as a new recipe
-      </label>
-      {#if saveAs}
-        <div class="field">
-          <label for="rname">Recipe name</label>
-          <input id="rname" class="input" placeholder="e.g. Yogurt from milk" bind:value={recipeName} />
-        </div>
-      {/if}
-    {/if}
-
     <div class="two">
       <div class="field">
         <label for="tdate">Date</label>
@@ -394,8 +310,11 @@
       {#if ins.some((x) => x.amount > 0) && outs.some((x) => x.amount > 0)}<span class="summary">{summary}</span>{/if}
       <button type="submit" class="btn btn-block go"><Icon name="transform" size={20} />Transform</button>
     </div>
+    {/if}
   </form>
 {/if}
+
+<RecipeSheet bind:open={newOpen} onsaved={(r) => useRecipe(r.id)} />
 
 <ConfirmSheet bind:open={confirm} title="Go below zero?" confirmLabel="Transform anyway" onconfirm={save}>
   {#each warnings as w (w.classId)}
@@ -429,32 +348,22 @@
     color: var(--ink);
     font-size: 14px;
   }
+  .chips .new {
+    border-style: dashed;
+    color: var(--accent);
+    font-weight: 600;
+  }
   .chips .on {
     background: var(--ink);
     border-color: var(--ink);
     color: var(--bg);
     font-weight: 600;
   }
-  .link {
-    min-height: var(--tap);
-    font-weight: 600;
-    padding: 0;
-  }
   .row {
     display: grid;
     gap: 6px;
     padding: 10px 0;
     border-top: 1px solid var(--divider);
-  }
-  .row-main {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-  }
-  .row-main select {
-    flex: 1 1 100%;
-    min-width: 0;
   }
   .amt {
     flex: 1 1 0;
@@ -554,17 +463,6 @@
     gap: 4px;
     padding-top: 8px;
     border-top: 1px solid var(--border);
-  }
-  .check {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-height: var(--tap);
-    padding: 0 4px;
-  }
-  .check input {
-    width: 20px;
-    height: 20px;
   }
   .two {
     display: grid;

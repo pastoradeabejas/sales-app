@@ -62,8 +62,7 @@
   }
   async function restore(r: Recipe) {
     if (recipeNameError(r.name, app.recipes, r.id)) {
-      showToast(`Rename first: another recipe is called ${r.name}`);
-      openSheet(r);
+      showToast(`Archive the other recipe called ${r.name} first`);
       return;
     }
     await saveRecipe({ ...r, archived: false });
@@ -278,7 +277,7 @@
             <span class="title">{r.name}</span>
             <span class="muted">{transformSummary(r.inputs, r.outputs, view.classesById)}</span>
           </span>
-          <button type="button" class="edit" aria-label="Edit {r.name}" onclick={() => openSheet(r)}>Edit</button>
+          <button type="button" class="edit" aria-label="View {r.name}" onclick={() => openSheet(r)}>View</button>
           <a class="use" href="#/stock/transform?recipe={r.id}" aria-label="Use {r.name}">Use</a>
         </div>
       {:else}

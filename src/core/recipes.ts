@@ -1,24 +1,16 @@
-// Recipe scaling and yield (spec §3.6a).
-import type { ClassAmount, Decimals } from './types.ts';
+// Recipes in Transform (spec §3.6a, D-019): a recipe is run a whole number of times.
+import type { ClassAmount } from './types.ts';
 
-// Half-up to an integer; toPrecision strips float noise such as 1.4999999.
-const roundInt = (x: number) => Math.round(Number(x.toPrecision(12)));
+type Batchable = { inputs: ClassAmount[]; outputs: ClassAmount[]; extras: { label: string; amount: number }[] };
 
-/**
- * Scaled amounts for rows (inputs then outputs) after one row changed: each other row is
- * base × factor, rounded half-up to its scaled integer (amounts are already in class decimals).
- */
-export function scaleRows(
-  rows: { classId: string; amount: number }[],
-  base: { classId: string; amount: number }[],
-  changed: { index: number; amount: number },
-  _decimalsOf: (classId: string) => Decimals,
-): number[] {
-  const from = base[changed.index].amount;
-  return rows.map((_, i) => (i === changed.index ? changed.amount : roundInt((base[i].amount * changed.amount) / from)));
+/** The recipe's inputs, outputs and cost extras multiplied by `n` batches. */
+export function batch(r: Batchable, n: number): Batchable {
+  const times = <T extends { amount: number }>(xs: T[]) => xs.map((x) => ({ ...x, amount: x.amount * n }));
+  return { inputs: times(r.inputs), outputs: times(r.outputs), extras: times(r.extras) };
 }
 
-/** Output base units per 1 input base unit (500 kg milk → 10,000 pcs gives 20). */
-export function recipeYield(input: ClassAmount, output: ClassAmount, decimalsOf: (classId: string) => Decimals): number {
-  return output.amount / 10 ** decimalsOf(output.classId) / (input.amount / 10 ** decimalsOf(input.classId));
+/** Number of batches from text: a whole number from 1, else null. */
+export function parseBatches(text: string): number | null {
+  const t = text.trim();
+  return /^\d+$/.test(t) && Number(t) >= 1 ? Number(t) : null;
 }
