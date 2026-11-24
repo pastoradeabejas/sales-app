@@ -40,10 +40,48 @@ const ORDERS: [number, number, string, 'P' | 'H' | 'U' | 'L' | 'V'][] = [
   [0, 6, 'mk:3 cho:1', 'U'],
 ];
 
+// The first seven clients are ordered by hand above; the others are [name, phone, tags, first day, step, last day, pool, payment policy].
+// Policy: g good payer (latest orders still unpaid), m some half paid or unpaid, r last 30 days unpaid, a never paid.
 const CLIENTS: [string, string, string[]][] = [
   ['Marta', '+34 600 111 222', ['family']], ['Lucía', '+34 611 222 333', ['neighbour']], ['Javier', '', ['work']],
   ['Ana', '', []], ['Pedro', '+34 622 333 444', []], ['Carmen', '', ['family']], ['Luis', '', []],
 ];
+const REGULARS: [string, string, string[], number, number, number, string, 'g' | 'm' | 'r' | 'a'][] = [
+  ['Rosa', '+34 633 100 101', ['market'], 119, 12, 4, 'dz hd but kef cl h5', 'g'],
+  ['Antonio', '+34 633 100 102', ['restaurant'], 116, 9, 2, 'sau lam but dz kef sa4', 'm'],
+  ['Elena', '+34 633 100 103', ['shop'], 118, 14, 5, 'h5 cs cl prop but sa4', 'g'],
+  ['Miguel', '', ['family'], 112, 20, 10, 'h1 cl dz lam', 'g'],
+  ['Carlos', '+34 633 100 105', ['restaurant'], 117, 10, 3, 'sau lam dz but kef', 'g'],
+  ['Isabel', '', ['market'], 114, 15, 6, 'cs cl hd kef prop', 'g'],
+  ['Francisco', '+34 633 100 107', ['shop'], 110, 13, 4, 'h5 h1 sa4 but kef cs', 'r'],
+  ['Pilar', '', ['neighbour'], 105, 21, 8, 'dz kef but', 'g'],
+  ['Joaquín', '+34 633 100 109', ['restaurant'], 112, 20, 12, 'sau lam dz but', 'a'],
+  ['Dolores', '', ['family'], 100, 16, 4, 'h5 cl prop hd lam', 'm'],
+  ['Raúl', '', [], 118, 25, 75, 'sa4 dz', 'a'],
+  ['Teresa', '+34 633 100 112', ['market'], 108, 11, 3, 'dz hd cs cl kef but', 'g'],
+  ['Sergio', '+34 633 100 113', ['shop'], 115, 17, 5, 'h5 h1 cl prop sa4', 'g'],
+  ['Inés', '', ['neighbour'], 120, 18, 70, 'hd kef but', 'g'],
+  ['Fernando', '+34 633 100 115', ['restaurant'], 113, 12, 1, 'sau lam dz sa4 but', 'g'],
+  ['Beatriz', '', ['work'], 115, 20, 80, 'cs h5', 'm'],
+  ['Alberto', '', [], 110, 22, 66, 'lam dz', 'g'],
+  ['Cristina', '+34 633 100 118', ['market'], 104, 13, 0, 'cl cs h5 hd kef prop box2', 'g'],
+];
+CLIENTS.push(...REGULARS.map(([name, phone, tags]): [string, string, string[]] => [name, phone, tags]));
+// Days ago from which each product exists (made or added); a generated order never goes further back.
+const FROM: Record<string, number> = {
+  h5: 98, h1: 98, cl: 100, cs: 100, prop: 124, but: 106, kef: 104, sau: 102, sa4: 102, lam: 124, dz: 110, hd: 110, box2: 31,
+};
+REGULARS.forEach(([, , , first, step, last, pool, policy], k) => {
+  const keys = pool.split(' ');
+  for (let j = 0, days = first; days >= last; j++, days -= step) {
+    const lines = [0, 1].slice(0, j % 3 === 0 ? 2 : 1).map((i) => keys[(j + i * 2 + k) % keys.length]).filter((key, i, a) => days <= FROM[key] && a.indexOf(key) === i);
+    if (!lines.length) continue;
+    const spec = lines.map((key) => `${key}:${/^(sau|lam)$/.test(key) ? 500 + ((j * 7 + k * 3) % 8) * 150 : 1 + ((j + k) % 3)}`).join(' ');
+    const status = policy === 'a' ? 'U' : policy === 'r' ? (days <= 30 ? 'U' : 'P')
+      : policy === 'm' ? (j % 3 === 0 ? 'H' : j % 5 === 1 ? 'U' : 'P') : days <= 3 ? 'U' : 'P';
+    ORDERS.push([days, 7 + k, spec, status]);
+  }
+});
 
 /** Sample records for Demo mode; `today` is the local date, `now` stamps every record. */
 export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
@@ -87,7 +125,9 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
   const emptyJar1 = packaging(11, 'Empty jar 1kg', 20);
   const lid = packaging(12, 'Lid', 50);
   const giftBox = packaging(13, 'Gift box', 5);
-  const xmasBox = product(14, 'Gifts', 'Christmas box', 'pcs', 0, 3, true, [['box', 'Box', 1, 2500, 1520]]);
+  const xmasBox = product(14, 'Gifts', 'Christmas box', 'pcs', 0, 3, true, [
+    ['box', 'Box', 1, 2500, 1520], ['box2', 'Deluxe (honey + candle)', 1, 3600, null],
+  ]);
   const comb = product(15, 'Honeycomb', 'Honeycomb', 'kg', 3, 2000, true, [['comb', 'By weight', null, 3000, 2000]]);
   const pollen = product(16, 'Pollen', '250g Jar', 'jar', 0, 8, true, [['pol', '250 g', 1, 700, 250]]);
   const rawMilk = product(17, 'Dairy/Milk', 'Raw milk', 'L', 0, 50, false, []);
@@ -103,26 +143,50 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
     ['mbf', 'By weight', null, 1300, 850], ['mb5', '500 g pack', 500, 700, 430],
   ]);
   const steak = product(25, 'Meat/Beef', 'Steak', 'kg', 3, 1000, true, [['stk', 'By weight', null, 2600, 1700]]);
+  const heatherBulk = bulk(26, 'Heather');
+  const h5 = jar(27, 'Heather', '500g Jar', 'h5', '500 g', 1250, 555, 10);
+  const h1 = jar(28, 'Heather', '1kg Jar', 'h1', '1 kg', 2200, 1070, 8);
+  const candle = product(29, 'Candles', 'Beeswax candle', 'pcs', 0, 10, true, [['cs', 'Small', 1, 650, null], ['cl', 'Large', 1, 1450, 820]]);
+  const propolis = product(30, 'Wellness', 'Propolis tincture', 'pcs', 0, 5, true, [['prop', '30 ml', 1, 1200, 600]]);
+  const butter = product(31, 'Dairy/Butter', 'Butter', 'pcs', 0, 8, true, [['but', '250 g', 1, 480, 260]]);
+  const kefir = product(32, 'Dairy/Kefir', 'Kefir', 'bottle', 0, 8, true, [['kef', '500 ml', 1, 280, 120]]);
+  const sausages = product(33, 'Meat/Pork', 'Sausages', 'kg', 3, 2000, true, [['sau', 'By weight', null, 1450, 900], ['sa4', '400 g pack', 400, 620, 380]]);
+  const lamb = product(34, 'Meat/Lamb', 'Lamb chops', 'kg', 3, 1500, true, [['lam', 'By weight', null, 2400, 1600]]);
+  const eggs = product(35, 'Eggs', 'Eggs', 'egg', 0, 24, true, [['dz', 'Dozen', 12, 360, 220], ['hd', 'Half dozen', 6, 190, null]]);
+  const rawMaterial = (n: number, name: string, unit: string, decimals: Decimals, low: number) => product(n, 'Raw materials', name, unit, decimals, low, false, []);
+  const labels = packaging(36, 'Labels', 100);
+  const wick = rawMaterial(37, 'Candle wick', 'm', 2, 500);
+  const beeswax = rawMaterial(38, 'Beeswax', 'kg', 3, 1000);
+  const butterPaper = packaging(39, 'Butter paper', 30);
+  const kefirBottle = packaging(40, 'Kefir bottle', 20);
+  const casing = rawMaterial(41, 'Sausage casing', 'm', 1, 100);
+  const eggBox = packaging(42, 'Egg box', 20);
+  const porkShoulder = rawMaterial(43, 'Pork shoulder', 'kg', 3, 3000);
+  const looseEggs = rawMaterial(44, 'Loose eggs', 'egg', 0, 60);
   const expense = (n: number, name: string): ProductClass => ({
     ...product(n, 'Expenses', name, 'pcs', 0, null, false, []), trackStock: false,
   });
-  const fuel = expense(26, 'Fuel');
-  const marketFee = expense(27, 'Market fee');
-  const hiveTreatment = expense(28, 'Hive treatment');
+  const [fuel, marketFee, hiveTreatment, electricity, vet, transport, stallRent, phone, insurance, equipment, feed] =
+    ['Fuel', 'Market fee', 'Hive treatment', 'Electricity', 'Vet', 'Packaging transport', 'Market stall rent', 'Phone', 'Insurance', 'Equipment', 'Feed']
+      .map((name, i) => expense(45 + i, name));
   const products = [
     flowerBulk, f5, f1, rosemaryBulk, r5, r1, oakBulk, o5, o1, emptyJar5, emptyJar1, lid, giftBox, xmasBox, comb, pollen,
-    rawMilk, bottle, curedCheese, freshCheese, yogurt, chorizo, porkLoin, minced, steak, fuel, marketFee, hiveTreatment,
+    rawMilk, bottle, curedCheese, freshCheese, yogurt, chorizo, porkLoin, minced, steak,
+    heatherBulk, h5, h1, candle, propolis, butter, kefir, sausages, lamb, eggs, labels, wick, beeswax, butterPaper, kefirBottle, casing, eggBox,
+    porkShoulder, looseEggs, fuel, marketFee, hiveTreatment, electricity, vet, transport, stallRent, phone, insurance, equipment, feed,
   ];
 
   const supplier = (n: number, name: string): Supplier => ({ ...base, id: `demo-supplier-${n}`, name, phone: '', notes: '', archived: false });
-  const [envases, apicola, gasolinera] = [supplier(1, 'Envases Levante'), supplier(2, 'Apícola Sur'), supplier(3, 'Gasolinera')];
+  const suppliers = ['Envases Levante', 'Apícola Sur', 'Gasolinera', 'Piensos del Valle', 'Clínica Veterinaria Sol', 'Iberluz', 'Seguros Mediterráneo', 'Imprenta Gráfica']
+    .map((name, i) => supplier(i + 1, name));
+  const [envases, apicola, gasolinera, piensos, clinica, iberluz, seguros, imprenta] = suppliers;
   const levels: WorkLevel[] = [['Level 1', 1200], ['Level 2', 1450], ['Level 3', 1800]].map(([name, hourlyRate], i) => ({
     ...base, id: `demo-level-${i + 1}`, name: name as string, hourlyRate: hourlyRate as number, archived: false,
   }));
   const levelsById = new Map(levels.map((l) => [l.id, l]));
 
   const clients: Client[] = CLIENTS.map(([name, phone, tags]) => ({
-    ...base, id: `demo-client-${name === 'Lucía' ? 'lucia' : name.toLowerCase()}`, name, phone, notes: '', tags, archived: false,
+    ...base, id: `demo-client-${name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()}`, name, phone, notes: '', tags, archived: false,
   }));
 
   const orders: Order[] = [];
@@ -169,7 +233,7 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
     ({ ...base, id: `demo-stock-${++seq}`, date: ago(days), note: '', voided: false, ...rest }) as StockEvent;
   // Cost per base unit of every product: the jars' own cost, then the adds (materials of later transforms).
   const unitCost = new Map<string, number>();
-  for (const { cls, v } of variants.values()) if (v.kind === 'fixed') unitCost.set(cls.id, v.cost!);
+  for (const { cls, v } of variants.values()) if (v.kind === 'fixed' && v.cost !== null) unitCost.set(cls.id, v.cost);
   const stock: StockEvent[] = [];
   const add = (days: number, cls: ProductClass, amount: number, cost: number) => {
     unitCost.set(cls.id, cost);
@@ -177,7 +241,7 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
   };
   // Purchases are always paid at once; a tracked line feeds the class average cost like an add with a unit cost.
   const purchases: Purchase[] = [];
-  const buy = (days: number, from: Supplier | null, lines: [ProductClass, number, number][]) => {
+  const buy = (days: number, from: Supplier | null, lines: [ProductClass, number, number][], voided = false) => {
     const rows = lines.map(([cls, amount, cost], j): PurchaseLine => {
       if (cls.trackStock) unitCost.set(cls.id, cost);
       return {
@@ -187,7 +251,7 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
     });
     purchases.push({
       ...base, id: `demo-purchase-${purchases.length + 1}`, date: ago(days), supplierId: from?.id ?? null, supplierName: from?.name ?? '',
-      lines: rows, total: rows.reduce((t, l) => t + l.lineTotal, 0), method: methods[purchases.length % methods.length], note: '', voided: false,
+      lines: rows, total: rows.reduce((t, l) => t + l.lineTotal, 0), method: methods[purchases.length % methods.length], note: voided ? 'Entered twice' : '', voided,
     });
   };
   const recipes: Recipe[] = [];
@@ -223,6 +287,17 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
   const fillO1 = fill('o1', 'Oak', '1kg', oakBulk, emptyJar1, o1, 1000, 60);
   const boxRecipe = recipe('box', 'Christmas box', [[f5, 1], [r1, 1], [giftBox, 1]], xmasBox, [['Time', 100]]);
 
+  const L1 = { levelId: 'demo-level-1' }, L2 = { levelId: 'demo-level-2' }, L3 = { levelId: 'demo-level-3' };
+  const fillH5 = recipe('h5', 'Fill Heather 500g', [[emptyJar5, 1], [lid, 1], [labels, 1], [heatherBulk, 500]], h5, [['Sealing wax', 8]], 1, [{ ...L1, minutes: 2 }]);
+  const fillH1 = recipe('h1', 'Fill Heather 1kg', [[emptyJar1, 1], [lid, 1], [labels, 1], [heatherBulk, 1000]], h1, [['Sealing wax', 8]], 1, [{ ...L1, minutes: 3 }]);
+  const candleL = recipe('candle-l', 'Make large candle', [[beeswax, 250], [wick, 30], [labels, 1]], candle, [['Electricity', 15]], 1, [{ ...L2, minutes: 20 }]);
+  const candleS = recipe('candle-s', 'Make small candle', [[beeswax, 90], [wick, 20], [labels, 1]], candle, [['Electricity', 8]], 1, [{ ...L2, minutes: 8 }]);
+  const butterRecipe = recipe('butter', 'Make butter', [[rawMilk, 20], [butterPaper, 4]], butter, [['Salt', 30], ['Electricity', 30]], 4, [{ ...L2, minutes: 45 }]);
+  const kefirRecipe = recipe('kefir', 'Make kefir', [[rawMilk, 1], [kefirBottle, 2]], kefir, [['Cultures', 25]], 2, [{ ...L1, minutes: 6 }]);
+  const sausageRecipe = recipe('sausage', 'Make sausages', [[porkShoulder, 5000], [casing, 40]], sausages, [['Spices', 600], ['Electricity', 40]], 4500, [{ ...L3, minutes: 75 }]);
+  const packEggs = recipe('eggs', 'Pack eggs', [[looseEggs, 12], [eggBox, 1]], eggs, [['Label', 5]], 12, [{ ...L1, minutes: 3 }]);
+  const deluxeBox = recipe('deluxe', 'Deluxe gift box', [[h5, 1], [candle, 1], [giftBox, 1]], xmasBox, [['Ribbon', 60]], 1, [{ ...L2, minutes: 6 }]);
+
   buy(125, apicola, [[flowerBulk, 60000, 650], [rosemaryBulk, 40000, 800], [oakBulk, 25000, 900]]);
   buy(125, envases, [[emptyJar5, 200, 35], [emptyJar1, 120, 50], [lid, 320, 12], [giftBox, 20, 150]]);
   add(125, pollen, 48, 250); add(125, comb, 14000, 2000);
@@ -248,16 +323,53 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
   make(58, bottleRecipe, 40); make(57, freshRecipe, 20); make(56, yogurtRecipe, 10);
   add(40, steak, 8000, 1700);
 
-  // Running costs over the demo months: fuel twice a month, a weekly market fee, one hive treatment.
+  // Candles, heather honey, butter, kefir, sausages, lamb and eggs.
+  buy(127, apicola, [[heatherBulk, 30000, 1000], [beeswax, 10000, 2200], [wick, 2000, 90]]);
+  buy(127, imprenta, [[labels, 300, 6]]);
+  buy(126, envases, [[eggBox, 150, 15], [butterPaper, 100, 8], [kefirBottle, 200, 45], [casing, 400, 150]]);
+  add(126, looseEggs, 1000, 18); add(126, porkShoulder, 20000, 600); add(126, lamb, 16000, 1600); add(126, propolis, 24, 600);
+  add(100, rawMilk, 600, 45);
+  make(112, packEggs, 30);
+  make(108, butterRecipe, 10); make(106, kefirRecipe, 30); make(104, sausageRecipe, 4);
+  make(102, candleL, 20); make(102, candleS, 30);
+  buy(101, envases, [[emptyJar5, 100, 36], [lid, 150, 13]]);
+  make(100, fillH5, 30); make(100, fillH1, 14);
+  buy(72, apicola, [[heatherBulk, 10000, 1050], [beeswax, 5000, 2300], [wick, 1000, 95]]);
+  buy(72, imprenta, [[labels, 200, 7]]);
+  buy(72, envases, [[eggBox, 100, 15], [butterPaper, 60, 8], [giftBox, 20, 150]]);
+  add(70, looseEggs, 600, 20);
+  make(68, packEggs, 20);
+  add(62, porkShoulder, 15000, 620);
+  make(58, sausageRecipe, 3);
+  make(55, butterRecipe, 8);
+  add(50, propolis, 12, 600); add(48, lamb, 12000, 1650);
+  make(45, candleL, 12); make(45, candleS, 20);
+  make(40, fillH5, 20);
+  make(36, kefirRecipe, 15);
+  make(33, deluxeBox, 8);
+  make(28, packEggs, 20);
+  make(14, butterRecipe, 6); make(12, packEggs, 12); make(8, kefirRecipe, 15);
+
+  // Running costs over the demo months: fuel twice a month, a weekly market fee, monthly bills, a few one-offs.
   for (let d = 115; d >= 10; d -= 15) buy(d, gasolinera, [[fuel, 1, 4000]]);
   for (let d = 119; d >= 0; d -= 7) buy(d, null, [[marketFee, 1, 2500]]);
-  buy(90, null, [[hiveTreatment, 1, 6000]]);
+  buy(90, apicola, [[hiveTreatment, 1, 6000]]);
+  [118, 88, 58, 28].forEach((d, i) => buy(d, iberluz, [[electricity, 1, [8450, 9120, 7890, 9340][i]]]));
+  [115, 85, 55, 25].forEach((d) => buy(d, null, [[stallRent, 1, 5000]]));
+  [110, 80, 50, 20].forEach((d) => buy(d, null, [[phone, 1, 2900]]));
+  [120, 95, 70, 45, 20].forEach((d, i) => buy(d, piensos, [[feed, 1, [15000, 16200, 14800, 15500, 16000][i]]]));
+  [125, 90, 55].forEach((d, i) => buy(d, envases, [[transport, 1, [1800, 2200, 1950][i]]]));
+  buy(100, clinica, [[vet, 1, 4500]]); buy(40, clinica, [[vet, 1, 12000]]);
+  buy(95, seguros, [[insurance, 1, 38000]]); buy(20, seguros, [[insurance, 1, 14500]]);
+  buy(105, apicola, [[equipment, 1, 4500]]);
+  buy(33, apicola, [[equipment, 1, 18500]], true); buy(32, apicola, [[equipment, 1, 18500]]);
+  buy(60, piensos, [[feed, 1, 7000], [equipment, 1, 2400]]);
 
   const as = (type: RecordType, records: object[]) => records.map((record) => ({ type, record }));
   return [
     ...as('product', products), ...as('client', clients), ...as('order', orders),
     ...as('payment', payments), ...as('stock', stock), ...as('recipe', recipes),
-    ...as('supplier', [envases, apicola, gasolinera]), ...as('level', levels), ...as('purchase', purchases),
+    ...as('supplier', suppliers), ...as('level', levels), ...as('purchase', purchases),
   ];
 }
 
