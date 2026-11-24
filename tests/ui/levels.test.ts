@@ -60,6 +60,11 @@ describe('costsFromForm with labour', () => {
     expect(c?.labour).toEqual(labour);
     expect(c?.total).toBe(1600);
   });
+  it('labour counts even when the Costs section was never opened (salary, §16.5)', () => {
+    const c = costsFromForm({ ...form, opened: false }, { materials: 1000, complete: true }, outs, labour).costs;
+    expect(c?.total).toBe(1600);
+    expect(costsFromForm({ ...form, opened: false }, { materials: 1000, complete: true }, outs, []).costs).toBeNull();
+  });
   it('labour alone is enough to keep the costs', () => {
     expect(costsFromForm(form, { materials: 0, complete: false }, outs, labour).costs?.total).toBe(600);
   });

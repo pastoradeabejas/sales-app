@@ -90,7 +90,7 @@ export function costsFromForm(
   outputs: ClassAmount[],
   labour: LabourCost[] = [],
 ): { costs: TransformCosts | null; error: string } {
-  if (!form.opened) return { costs: null, error: '' };
+  if (!form.opened && !labour.length) return { costs: null, error: '' };
   const extras = [];
   if (form.mode === 'breakdown') {
     for (const x of form.extras) {
