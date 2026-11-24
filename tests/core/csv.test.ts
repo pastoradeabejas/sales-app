@@ -73,6 +73,11 @@ describe('exports', () => {
     expect(out[3]).toBe('e3,2026-11-03,transform in,Milk,1,kg,,,,false');
     expect(out[4]).toBe('e3,2026-11-03,transform out,Milk,20,kg,,,,false');
   });
+  it('stockCsv: a grouped class shows its full name', () => {
+    const grouped = { ...cls, id: 'c2', name: '500g Jar', group: 'Honey/Rosemary' } as ProductClass;
+    const e: StockEvent = { ...stamp, id: 'e4', date: '2026-11-04', type: 'add', classId: 'c2', amount: 3, unitCost: null, reason: '', note: '', voided: false };
+    expect(rows(stockCsv([e], new Map([['c2', grouped]])))[1]).toContain(',add,Honey - Rosemary - 500g Jar,');
+  });
   it('exportFiles: five named files', () => {
     const files = exportFiles({ orders: [], payments: [], clients: [], stock: [], classes: [] }, '2026-11-24');
     expect(files.map((f) => f.name)).toEqual([

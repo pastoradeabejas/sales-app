@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { fullName } from '../../../core/groups.ts';
   import { formatAmount } from '../../../core/quantity.ts';
   import type { Movement } from '../../../core/stock.ts';
   import type { ProductClass } from '../../../core/types.ts';
@@ -14,7 +15,7 @@
   const fmt = (v: number) => formatAmount(v, cls.unit.decimals, cls.unit.name);
   const label = $derived(
     m
-      ? `${cls.name} stock from ${dayLabel(m.first, today)} to ${dayLabel(m.last, today)}: highest ${fmt(m.max)}, now ${fmt(m.days[m.days.length - 1].balance)}.`
+      ? `${fullName(cls)} stock from ${dayLabel(m.first, today)} to ${dayLabel(m.last, today)}: highest ${fmt(m.max)}, now ${fmt(m.days[m.days.length - 1].balance)}.`
       : '',
   );
 </script>
@@ -45,7 +46,7 @@
     </div>
     <div class="visually-hidden">
       <table>
-      <caption>{cls.name} stock at the end of each day with movements</caption>
+      <caption>{fullName(cls)} stock at the end of each day with movements</caption>
       <thead><tr><th scope="col">Date</th><th scope="col">Stock</th></tr></thead>
       <tbody>
         {#each m.days as d (d.date)}<tr><td>{d.date}</td><td>{fmt(d.balance)}</td></tr>{/each}

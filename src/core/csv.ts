@@ -1,4 +1,5 @@
 // CSV exports (spec §8.1): RFC 4180 writer plus one function per export file.
+import { fullName } from './groups.ts';
 import { allocateAll, orderState } from './payments.ts';
 import type { ClientBalance } from './payments.ts';
 import { toBaseUnits } from './quantity.ts';
@@ -62,7 +63,7 @@ export function clientsCsv(clients: Client[], balances: Map<string, ClientBalanc
 export function stockCsv(events: StockEvent[], classesById: Map<string, ProductClass>): string {
   const row = (e: StockEvent, type: string, classId: string, amount: number, cost: UnitCost | null, reason: string): Cell[] => {
     const c = classesById.get(classId);
-    return [e.id, e.date, type, c?.name ?? classId, toBaseUnits(amount, c?.unit.decimals ?? 0), c?.unit.name ?? '', unitCost(cost), reason, e.note, e.voided];
+    return [e.id, e.date, type, c ? fullName(c) : classId, toBaseUnits(amount, c?.unit.decimals ?? 0), c?.unit.name ?? '', unitCost(cost), reason, e.note, e.voided];
   };
   return toCsv(
     ['event_id', 'date', 'type', 'class', 'amount', 'unit', 'unit_cost_eur', 'reason', 'note', 'voided'],

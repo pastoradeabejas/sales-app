@@ -10,6 +10,7 @@
   import Segmented from '../../components/Segmented.svelte';
   import Sheet from '../../components/Sheet.svelte';
   import { app, view } from '../../data.svelte.ts';
+  import { liveName } from '../stock/grouping.ts';
   import { bucketLabel, seriesMetric } from './logic.ts';
 
   let { open = $bindable(false), cls, range }: { open: boolean; cls: ClassSold | null; range: Range } = $props();
@@ -36,7 +37,7 @@
   });
 </script>
 
-<Sheet bind:open title={cls ? `${cls.className} sold` : 'Sold'}>
+<Sheet bind:open title={cls ? `${liveName(view.classesById, cls.classId, cls.className)} sold` : 'Sold'}>
   {#if cls}
     <Segmented
       label="Chart type"
@@ -44,9 +45,9 @@
       bind:value={kind}
     />
     {#if kind === 'bars'}
-      <StackedBars {points} label="{cls.className} {metric === 'units' ? 'items' : 'amount'} sold" {format} {selected} onselect={(i) => (selected = i)} />
+      <StackedBars {points} label="{liveName(view.classesById, cls.classId, cls.className)} {metric === 'units' ? 'items' : 'amount'} sold" {format} {selected} onselect={(i) => (selected = i)} />
     {:else}
-      <LineChart {points} label="{cls.className} {metric === 'units' ? 'items' : 'amount'} sold" {format} {selected} onselect={(i) => (selected = i)} />
+      <LineChart {points} label="{liveName(view.classesById, cls.classId, cls.className)} {metric === 'units' ? 'items' : 'amount'} sold" {format} {selected} onselect={(i) => (selected = i)} />
     {/if}
     {#if selected !== null}
       <div class="list">

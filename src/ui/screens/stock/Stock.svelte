@@ -3,12 +3,15 @@
   import Header from '../../components/Header.svelte';
   import Icon from '../../components/Icon.svelte';
   import Tag from '../../components/Tag.svelte';
+  import { buildTree } from '../../../core/groups.ts';
   import type { Recipe } from '../../../core/types.ts';
   import { formatAmount } from '../../../core/quantity.ts';
   import { isLowStock, sellRate } from '../../../core/stock.ts';
   import { app, localDate, saveRecipe, view } from '../../data.svelte.ts';
   import { showToast } from '../../toast.svelte.ts';
   import { activeRecipes, daysLeftText, lastMovementText, recentMovements, recipeNameError, transformSummary } from './logic.ts';
+  import GroupHeader from './GroupHeader.svelte';
+  import { flattenTree, loadCollapsed, saveCollapsed, toggleCollapsed } from './grouping.ts';
   import RecipeSheet from './RecipeSheet.svelte';
 
   const today = localDate();
@@ -18,6 +21,8 @@
       const s = view.snapshot.get(c.id);
       const stock = s?.stock ?? 0;
       return {
+        name: c.name,
+        group: c.group,
         cls: c,
         stock,
         low: isLowStock(c, stock),
@@ -26,6 +31,13 @@
       };
     }),
   );
+  const tree = $derived(buildTree(items));
+  let collapsed = $state(loadCollapsed(localStorage, 'stockCollapsed'));
+  const rows = $derived(flattenTree(tree, { collapsed, force: () => false }));
+  function toggle(path: string) {
+    collapsed = toggleCollapsed(collapsed, path);
+    saveCollapsed(localStorage, 'stockCollapsed', collapsed);
+  }
   const recent = $derived(recentMovements(app.orders, app.stock, app.recipes, view.classesById, today));
   const recipes = $derived(activeRecipes(app.recipes));
   const archived = $derived(app.recipes.filter((r) => r.archived).sort((a, b) => a.name.localeCompare(b.name)));
@@ -65,8 +77,12 @@
   {:else}
     <section class="current">
       <h2>Current stock</h2>
-      {#each items as s (s.cls.id)}
-        <a class="card stock-card" href="#/stock/{s.cls.id}">
+      {#each rows as r (r.kind === 'group' ? `g:${r.node.path}` : r.item.cls.id)}
+        {#if r.kind === 'group'}
+          <GroupHeader name={r.node.name} count={r.node.count} open={r.open} depth={r.depth} ontoggle={() => toggle(r.node.path)} />
+        {:else}
+        {@const s = r.item}
+        <a class="card stock-card" style:margin-left="{r.depth * 12}px" href="#/stock/{s.cls.id}">
           <div class="row-between">
             <span class="name">
               <span class="title">{s.cls.name}</span>
@@ -80,6 +96,7 @@
             {#if s.stock < 0}<Tag tone="negative">sold without stock</Tag>{:else}<span>{s.left}</span>{/if}
           </div>
         </a>
+        {/if}
       {/each}
     </section>
 
@@ -92,8 +109,8 @@
             <span class="grow">
               <span class="title ellipsis">{m.title}</span>
               <span class="muted ellipsis">{m.sub}</span>
+              <span class="deltas">{#each m.deltas as d (d)}<span>{d}</span>{/each}</span>
             </span>
-            <span class="deltas">{#each m.deltas as d (d)}<span>{d}</span>{/each}</span>
           </a>
         {:else}
           <p class="muted">No movements yet.</p>
@@ -234,13 +251,12 @@
     background: var(--owed-tag);
     color: var(--owed-on-bg);
   }
+  /* Under the title, full width: product names can be long (D-015). */
   .deltas {
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
-    font-size: 14px;
-    font-weight: 700;
-    text-align: right;
+    font-size: var(--fs-small);
+    font-weight: 600;
   }
   .new {
     min-height: var(--tap);

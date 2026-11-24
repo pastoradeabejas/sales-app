@@ -150,6 +150,7 @@ export function newClassDraft(): ProductClass {
   return {
     ...fresh(),
     name: '',
+    group: '',
     unit: { name: 'pcs', decimals: 0 },
     lowStockThreshold: null,
     trackStock: true,

@@ -1,5 +1,6 @@
 // Commit messages (§6.2) and conflict toasts (§6.4) for record pushes.
 import { formatMoney } from '../core/money.ts';
+import { fullName } from '../core/groups.ts';
 import { lineSummary } from '../core/orders.ts';
 import { formatAmount } from '../core/quantity.ts';
 import type { ClassAmount, RecordType } from '../core/types.ts';
@@ -13,7 +14,7 @@ const nameOf = async (lookup: Lookup, store: StoreName, id: string) => (await lo
 async function side(lookup: Lookup, items: ClassAmount[], sign: '+' | '−') {
   const parts = await Promise.all(items.map(async ({ classId, amount }) => {
     const cls = await lookup('products', classId);
-    return `${cls?.name ?? classId} ${sign}${formatAmount(amount, cls?.unit.decimals ?? 0, cls?.unit.name)}`;
+    return `${cls ? fullName(cls) : classId} ${sign}${formatAmount(amount, cls?.unit.decimals ?? 0, cls?.unit.name)}`;
   }));
   return parts.join(', ');
 }
@@ -30,7 +31,7 @@ async function describe(type: RecordType, r: any, lookup: Lookup): Promise<[stri
       if (r.type === 'transform') return [`transform${v}`, `${await side(lookup, r.inputs, '−')} → ${await side(lookup, r.outputs, '+')}`];
       return [`stock ${r.type}${v}`, await side(lookup, [r], r.type === 'add' ? '+' : '−')];
     default:
-      return [type, r.name];
+      return [type, fullName(r)];
   }
 }
 

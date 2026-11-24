@@ -4,12 +4,14 @@
   import Header from '../../components/Header.svelte';
   import Sheet from '../../components/Sheet.svelte';
   import Tag from '../../components/Tag.svelte';
+  import { fullName } from '../../../core/groups.ts';
   import { formatMoney, formatUnitCost } from '../../../core/money.ts';
   import { formatAmount, parseAmount } from '../../../core/quantity.ts';
   import { classTimeline, isLowStock, sellRate } from '../../../core/stock.ts';
   import type { StockEvent } from '../../../core/types.ts';
   import { app, localDate, saveClass, view, voidStockEvent } from '../../data.svelte.ts';
   import { showToast } from '../../toast.svelte.ts';
+  import { liveName } from './grouping.ts';
   import StockChart from './StockChart.svelte';
   import { cap, dayLabel, daysLeftText, movementLabel, rateText, reasonLabel, signedAmount, transformSummary } from './logic.ts';
 
@@ -61,7 +63,7 @@
     showToast(event.type === 'transform' ? 'Transform voided: inputs restored, outputs removed' : 'Stock event voided');
   }
   const typeLabel = (e: StockEvent) => (e.type === 'add' ? 'Add' : e.type === 'remove' ? 'Remove' : 'Transform');
-  const nameOf = (id: string) => view.classesById.get(id)?.name ?? 'Unknown';
+  const nameOf = (id: string) => liveName(view.classesById, id);
 </script>
 
 {#if !cls || !cls.trackStock}
@@ -72,7 +74,7 @@
     </EmptyState>
   </div>
 {:else}
-  <Header title={cls.name} back="#/stock">
+  <Header title={fullName(cls)} back="#/stock">
     {#snippet actions()}
       {#if !cls.sellable}<Tag>Raw material</Tag>{/if}
       {#if cls.archived}<Tag tone="voided">Archived</Tag>{/if}

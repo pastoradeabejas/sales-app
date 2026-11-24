@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { demoRecords, loadDemo } from '../../src/store/demo.ts';
 import { memoryBackend } from '../../src/store/memory.ts';
 import { createStore } from '../../src/store/store.ts';
+import { fullName } from '../../src/core/groups.ts';
 import type { Client, Order, Payment, ProductClass, Recipe, StockEvent } from '../../src/core/types.ts';
 
 const today = '2026-11-23';
@@ -25,14 +26,43 @@ describe('demoRecords', () => {
     expect(ids.every((id) => id.startsWith('demo-'))).toBe(true);
   });
 
-  it('has the sample catalogue, clients and recipe', () => {
-    expect(products.map((p) => p.name)).toEqual(['Parmigiano Reggiano', 'Ryzen 5', 'Olive oil', 'Milk', 'Yogurt']);
-    expect(products.find((p) => p.name === 'Milk')).toMatchObject({ sellable: false, unit: { name: 'kg', decimals: 3 } });
-    const parm = products[0];
-    expect(parm.variants.map((v) => `${v.label}/${v.kind}`)).toEqual(['200 g/fixed', '500 g/fixed', '3 kg/fixed', 'Cut to order/variable']);
+  it('has the honey shop catalogue in groups, clients and recipes', () => {
+    expect(products.map(fullName)).toEqual([
+      'Honey - Flower - Bulk', 'Honey - Flower - 500g Jar', 'Honey - Flower - 1kg Jar',
+      'Honey - Rosemary - Bulk', 'Honey - Rosemary - 500g Jar', 'Honey - Rosemary - 1kg Jar',
+      'Honey - Oak - Bulk', 'Honey - Oak - 500g Jar', 'Honey - Oak - 1kg Jar',
+      'Packaging - Empty jar 500g', 'Packaging - Empty jar 1kg', 'Packaging - Lid', 'Packaging - Gift box',
+      'Gifts - Christmas box', 'Honeycomb - Honeycomb', 'Pollen - 250g Jar',
+    ]);
+    expect(products.find((p) => fullName(p) === 'Honey - Flower - Bulk')).toMatchObject({ sellable: false, unit: { name: 'kg', decimals: 3 } });
+    const jar = products.find((p) => fullName(p) === 'Honey - Rosemary - 500g Jar')!;
+    expect(jar).toMatchObject({ sellable: true, unit: { name: 'jar', decimals: 0 }, lowStockThreshold: 10 });
+    expect(jar.variants.map((v) => `${v.label}/${v.kind}/${v.baseAmount}`)).toEqual(['500 g/fixed/1']);
+    expect(products.find((p) => p.name === 'Honeycomb')!.variants.map((v) => `${v.label}/${v.kind}`)).toEqual(['By weight/variable']);
     expect(clients.map((c) => c.name)).toEqual(['Marta', 'Lucía', 'Javier', 'Ana', 'Pedro', 'Carmen', 'Luis']);
-    expect(recipes).toHaveLength(1);
-    expect(recipes[0]).toMatchObject({ name: 'Yogurt from milk', inputs: [{ amount: 500000 }], outputs: [{ amount: 10000 }] });
+    expect(recipes.map((r) => r.name)).toEqual([
+      'Fill Flower 500g', 'Fill Flower 1kg', 'Fill Rosemary 500g', 'Fill Rosemary 1kg', 'Fill Oak 500g', 'Fill Oak 1kg', 'Christmas box',
+    ]);
+    const names = (r: Recipe) => r.inputs.map((i) => `${i.amount} ${fullName(products.find((p) => p.id === i.classId)!)}`);
+    expect(names(recipes[0])).toEqual(['1 Packaging - Empty jar 500g', '1 Packaging - Lid', '500 Honey - Flower - Bulk']);
+    expect(names(recipes[6])).toEqual(['1 Honey - Flower - 500g Jar', '1 Honey - Rosemary - 1kg Jar', '1 Packaging - Gift box']);
+  });
+
+  it('never lets any stock go below zero over time', () => {
+    const moves: [string, number, string, number][] = []; // [date, order (stock before sales), class, delta]
+    for (const e of stock) {
+      if (e.type === 'transform') {
+        e.inputs.forEach((x) => moves.push([e.date, 0, x.classId, -x.amount]));
+        e.outputs.forEach((x) => moves.push([e.date, 0, x.classId, x.amount]));
+      } else moves.push([e.date, 0, e.classId, e.type === 'add' ? e.amount : -e.amount]);
+    }
+    for (const o of orders.filter((x) => !x.voided)) o.lines.forEach((l) => moves.push([o.date, 1, l.classId, -l.amount]));
+    moves.sort((a, b) => a[0].localeCompare(b[0]) || a[1] - b[1]);
+    const balance = new Map<string, number>();
+    for (const [, , id, d] of moves) {
+      balance.set(id, (balance.get(id) ?? 0) + d);
+      expect(balance.get(id)).toBeGreaterThanOrEqual(0);
+    }
   });
 
   it('every line total follows §4.1 and every order total is the sum of its lines', () => {
@@ -89,21 +119,26 @@ describe('demoRecords', () => {
     expect(credit.map((c) => c.name)).toEqual(['Carmen']);
   });
 
-  it('has stock adds with costs, one remove and one Milk → Yogurt transform with breakdown costs', () => {
+  it('has stock adds with costs, one remove, fill transforms and one Christmas box transform with breakdown costs', () => {
     expect(stock.filter((s) => s.type === 'add').every((s) => s.type === 'add' && s.unitCost !== null)).toBe(true);
     expect(stock.filter((s) => s.type === 'remove')).toHaveLength(1);
-    const t = stock.filter((s) => s.type === 'transform');
-    expect(t).toHaveLength(1);
-    const tr = t[0];
-    if (tr.type !== 'transform') throw new Error('not a transform');
-    const milk = products.find((p) => p.name === 'Milk')!;
-    const yogurt = products.find((p) => p.name === 'Yogurt')!;
-    expect(tr.inputs).toEqual([{ classId: milk.id, amount: 500000 }]);
-    expect(tr.outputs).toEqual([{ classId: yogurt.id, amount: 10000 }]);
-    expect(tr.recipeId).toBe(recipes[0].id);
-    const c = tr.costs!;
-    expect(c.mode).toBe('breakdown');
-    expect(c.total).toBe(c.materials + c.extras.reduce((s, e) => s + e.amount, 0));
+    const transforms = stock.flatMap((s) => (s.type === 'transform' ? [s] : []));
+    expect(transforms.length).toBeGreaterThanOrEqual(8);
+    const recipeIds = new Set(recipes.map((r) => r.id));
+    for (const tr of transforms) {
+      expect(recipeIds.has(tr.recipeId!)).toBe(true);
+      const c = tr.costs!;
+      expect(c.mode).toBe('breakdown');
+      expect(c.extras.length).toBeGreaterThan(0);
+      expect(c.total).toBe(c.materials + c.extras.reduce((s, e) => s + e.amount, 0));
+    }
+    const boxId = products.find((p) => p.name === 'Christmas box')!.id;
+    const box = transforms.filter((t) => t.outputs[0].classId === boxId);
+    expect(box).toHaveLength(1);
+    expect(box[0].outputs).toEqual([{ classId: boxId, amount: 10 }]);
+    expect(box[0].costs!.extras).toEqual([{ label: 'Time', amount: 1000 }]);
+    const fill = transforms[0];
+    expect(fill.costs!.extras.map((e) => e.label)).toEqual(['Labels', 'Time']);
   });
 });
 

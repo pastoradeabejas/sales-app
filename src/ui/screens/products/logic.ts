@@ -1,19 +1,23 @@
 import { normalizeName } from '../../../core/clients.ts';
+import { normalizeGroup } from '../../../core/groups.ts';
 import { parseAmount } from '../../../core/quantity.ts';
 import { formatMoney, parseMoney, parseUnitCost } from '../../../core/money.ts';
 import type { Cents, Decimals, UnitCost, VariantKind } from '../../../core/types.ts';
 
+/** Required, max 60, unique within its group among non-archived classes (D-015). */
 export function validateClassName(
   name: string,
-  classes: { id: string; name: string; archived: boolean }[],
+  classes: { id: string; name: string; archived: boolean; group?: string }[],
   selfId?: string,
+  group = '',
 ): string | null {
   const t = name.trim();
   if (!t) return 'Name is required';
   if (t.length > 60) return 'Name is too long (max 60)';
   const key = normalizeName(t);
-  return classes.some((c) => !c.archived && c.id !== selfId && normalizeName(c.name) === key)
-    ? 'A class with this name already exists'
+  const g = normalizeGroup(group);
+  return classes.some((c) => !c.archived && c.id !== selfId && normalizeGroup(c.group) === g && normalizeName(c.name) === key)
+    ? 'A product with this name already exists in this group'
     : null;
 }
 

@@ -42,6 +42,14 @@ describe('commitMessage (§6.2)', () => {
     expect(await commitMessage('Mac', entry('recipe', { name: 'Yogurt from milk' }), lookup)).toBe('[Mac] recipe: Yogurt from milk');
   });
 
+  it('uses the full name of grouped products', async () => {
+    classes.bulk = { id: 'bulk', name: 'Bulk', group: 'Honey/Rosemary', unit: { name: 'kg', decimals: 3 } };
+    classes.jar = { id: 'jar', name: '500g Jar', group: 'Honey/Rosemary', unit: { name: 'jar', decimals: 0 } };
+    expect(await commitMessage('Mac', entry('product', { name: '500g Jar', group: 'Honey/Rosemary' }), lookup)).toBe('[Mac] product: Honey - Rosemary - 500g Jar');
+    const tr = { type: 'transform', inputs: [{ classId: 'bulk', amount: 500 }], outputs: [{ classId: 'jar', amount: 1 }], voided: false };
+    expect(await commitMessage('Mac', entry('stock', tr), lookup)).toBe('[Mac] transform: Honey - Rosemary - Bulk −0.5 kg → Honey - Rosemary - 500g Jar +1 jar');
+  });
+
   it('builds the conflict toast (§6.4)', async () => {
     expect(await conflictToast('order', { ...order, updatedBy: 'Phone B' }, lookup)).toBe("Marta's order was changed on Phone B; showing the latest version");
     expect(await conflictToast('client', { name: 'Marta', updatedBy: 'Mac' }, lookup)).toBe('Marta was changed on Mac; showing the latest version');

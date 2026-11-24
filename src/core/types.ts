@@ -54,6 +54,8 @@ export interface Variant extends Stamped {
 
 export interface ProductClass extends RecordBase {
   name: string;
+  /** Group path such as "Honey/Rosemary"; "" or missing = top level (D-015). */
+  group?: string;
   unit: Unit;
   lowStockThreshold: Scaled | null;
   trackStock: boolean;

@@ -19,17 +19,17 @@ const roundDiv = (a: number, d: number) => Math.floor((2 * a + d) / (2 * d));
 // Order specs: [days ago, client index, lines "variant:qty-or-scaled-amount", payment].
 // P paid on a linked payment, H half paid, U unpaid, L paid later by an unlinked payment, V voided.
 const ORDERS: [number, number, string, 'P' | 'H' | 'U' | 'L' | 'V'][] = [
-  [120, 0, 'p500:2', 'P'], [118, 2, 'r5600:1', 'P'], [116, 3, 'p200:3 o05:2', 'P'], [113, 1, 'pcut:1373', 'L'],
-  [110, 4, 'o5:1', 'P'], [108, 5, 'p500:1 p200:2', 'P'], [105, 6, 'r3600:2', 'P'], [102, 0, 'pcut:860 o05:1', 'P'],
-  [99, 1, 'p3k:1', 'L'], [96, 2, 'r7600:1', 'H'], [93, 3, 'p500:2', 'P'], [90, 4, 'pcut:2140', 'P'],
-  [87, 5, 'o05:4', 'P'], [84, 6, 'p200:2', 'U'], [81, 0, 'r5600:1', 'P'], [78, 1, 'p500:1 o05:2', 'L'],
-  [75, 2, 'pcut:1015', 'P'], [72, 3, 'o5:1 p200:1', 'P'], [69, 4, 'r3600:1', 'V'], [66, 5, 'p3k:1', 'P'],
-  [63, 0, 'p500:3', 'P'], [59, 6, 'ycup:12', 'P'], [56, 1, 'y4:6 pcut:745', 'L'], [53, 2, 'ycup:24', 'P'],
-  [50, 3, 'pcut:1290', 'H'], [47, 4, 'y4:10', 'P'], [44, 5, 'p500:2 y4:4', 'P'], [41, 0, 'o05:3', 'P'],
-  [37, 6, 'r7600:1', 'H'], [34, 1, 'p200:4', 'L'], [30, 2, 'y4:8 ycup:6', 'U'], [27, 3, 'p500:1', 'P'],
-  [23, 4, 'pcut:1580 o05:1', 'U'], [20, 5, 'ycup:20', 'P'], [16, 0, 'p3k:1 p500:1', 'H'], [13, 1, 'y4:5', 'P'],
-  [9, 6, 'pcut:930', 'U'], [6, 3, 'ycup:10 y4:2', 'U'], [3, 0, 'p200:2 o05:2', 'U'], [1, 4, 'r5600:1', 'P'],
-  [0, 2, 'pcut:1137', 'U'],
+  [120, 0, 'f5:2', 'P'], [118, 2, 'r5:1 f1:1', 'P'], [116, 3, 'f5:3 pol:2', 'P'], [113, 1, 'comb:1373', 'L'],
+  [110, 4, 'r1:1', 'P'], [108, 5, 'f5:1 pol:2', 'P'], [105, 6, 'f1:2', 'P'], [102, 0, 'comb:860 r5:1', 'P'],
+  [99, 1, 'o5:2 o1:1', 'L'], [96, 2, 'r1:1', 'H'], [93, 3, 'f5:2', 'P'], [90, 4, 'comb:2140', 'P'],
+  [87, 5, 'r5:4', 'P'], [84, 6, 'f5:2', 'U'], [81, 0, 'f1:1', 'P'], [78, 1, 'f5:1 r5:2', 'L'],
+  [75, 2, 'comb:1015', 'P'], [72, 3, 'o1:1 f5:1', 'P'], [69, 4, 'r1:1', 'V'], [66, 5, 'o5:3', 'P'],
+  [63, 0, 'f5:3', 'P'], [59, 6, 'pol:3', 'P'], [56, 1, 'pol:6 comb:745', 'L'], [53, 2, 'o5:4', 'P'],
+  [50, 3, 'comb:1290', 'H'], [47, 4, 'box:2', 'P'], [44, 5, 'f5:2 pol:4', 'P'], [41, 0, 'r5:3', 'P'],
+  [37, 6, 'box:1', 'H'], [34, 1, 'f5:4', 'L'], [30, 2, 'pol:8 r5:6', 'U'], [27, 3, 'f1:1', 'P'],
+  [23, 4, 'comb:1580 o1:1', 'U'], [20, 5, 'box:3', 'P'], [16, 0, 'r1:2 f5:1', 'H'], [13, 1, 'pol:5', 'P'],
+  [9, 6, 'comb:930', 'U'], [6, 3, 'box:2 pol:2', 'U'], [3, 0, 'f5:2 r5:2', 'U'], [1, 4, 'r1:1', 'P'],
+  [0, 2, 'comb:1137', 'U'],
 ];
 
 const CLIENTS: [string, string, string[]][] = [
@@ -45,11 +45,11 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
 
   const variants = new Map<string, { cls: ProductClass; v: Variant }>();
   const product = (
-    n: number, name: string, unit: string, decimals: Decimals, low: number | null, sellable: boolean,
+    n: number, group: string, name: string, unit: string, decimals: Decimals, low: number | null, sellable: boolean,
     vs: [key: string, label: string, baseAmount: number | null, price: number, cost: number | null][],
   ): ProductClass => {
     const cls: ProductClass = {
-      ...base, id: `demo-class-${n}`, name, unit: { name: unit, decimals }, lowStockThreshold: low, trackStock: true,
+      ...base, id: `demo-class-${String(n).padStart(2, '0')}`, name, group, unit: { name: unit, decimals }, lowStockThreshold: low, trackStock: true,
       sellable, customFields: [], customValues: {}, notes: '', archived: false, variants: [],
     };
     cls.variants = vs.map(([key, label, baseAmount, price, cost], i) => {
@@ -62,19 +62,29 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
     });
     return cls;
   };
-  const parm = product(1, 'Parmigiano Reggiano', 'kg', 3, 2000, true, [
-    ['p200', '200 g', 200, 600, 320], ['p500', '500 g', 500, 1400, 750], ['p3k', '3 kg', 3000, 7800, 4200],
-    ['pcut', 'Cut to order', null, 2600, null],
-  ]);
-  parm.customFields = [{ key: 'aging', label: 'Aging (months)', type: 'number' }];
-  parm.customValues = { aging: 24 };
-  const ryzen = product(2, 'Ryzen 5', 'pcs', 0, 3, true, [
-    ['r3600', '3600', 1, 9500, 7000], ['r5600', '5600', 1, 13500, 10500], ['r7600', '7600', 1, 21000, 16500],
-  ]);
-  const oil = product(3, 'Olive oil', 'L', 2, 500, true, [['o05', '0.5 L bottle', 50, 650, 450], ['o5', '5 L tin', 500, 5200, 4500]]);
-  const milk = product(4, 'Milk', 'kg', 3, 50000, false, []);
-  const yogurt = product(5, 'Yogurt', 'pcs', 0, 200, true, [['ycup', '125 g cup', 1, 80, 2.67], ['y4', '4-pack', 4, 290, 10.68]]);
-  const products = [parm, ryzen, oil, milk, yogurt];
+  const bulk = (n: number, honey: string) => product(n, `Honey/${honey}`, 'Bulk', 'kg', 3, 5000, false, []);
+  const jar = (n: number, honey: string, name: string, key: string, label: string, price: number, cost: number, low: number) =>
+    product(n, `Honey/${honey}`, name, 'jar', 0, low, true, [[key, label, 1, price, cost]]);
+  const flowerBulk = bulk(1, 'Flower');
+  const f5 = jar(2, 'Flower', '500g Jar', 'f5', '500 g', 850, 390, 10);
+  const f1 = jar(3, 'Flower', '1kg Jar', 'f1', '1 kg', 1500, 770, 10);
+  const rosemaryBulk = bulk(4, 'Rosemary');
+  const r5 = jar(5, 'Rosemary', '500g Jar', 'r5', '500 g', 950, 465, 10);
+  const r1 = jar(6, 'Rosemary', '1kg Jar', 'r1', '1 kg', 1700, 880, 10);
+  const oakBulk = bulk(7, 'Oak');
+  const o5 = jar(8, 'Oak', '500g Jar', 'o5', '500 g', 900, 515, 10);
+  const o1 = jar(9, 'Oak', '1kg Jar', 'o1', '1 kg', 1600, 980, 10);
+  const packaging = (n: number, name: string, low: number) => product(n, 'Packaging', name, 'pcs', 0, low, false, []);
+  const emptyJar5 = packaging(10, 'Empty jar 500g', 30);
+  const emptyJar1 = packaging(11, 'Empty jar 1kg', 20);
+  const lid = packaging(12, 'Lid', 50);
+  const giftBox = packaging(13, 'Gift box', 5);
+  const xmasBox = product(14, 'Gifts', 'Christmas box', 'pcs', 0, 3, true, [['box', 'Box', 1, 2500, 1520]]);
+  const comb = product(15, 'Honeycomb', 'Honeycomb', 'kg', 3, 2000, true, [['comb', 'By weight', null, 3000, 2000]]);
+  const pollen = product(16, 'Pollen', '250g Jar', 'jar', 0, 8, true, [['pol', '250 g', 1, 700, 250]]);
+  const products = [
+    flowerBulk, f5, f1, rosemaryBulk, r5, r1, oakBulk, o5, o1, emptyJar5, emptyJar1, lid, giftBox, xmasBox, comb, pollen,
+  ];
 
   const clients: Client[] = CLIENTS.map(([name, phone, tags]) => ({
     ...base, id: `demo-client-${name === 'Lucía' ? 'lucia' : name.toLowerCase()}`, name, phone, notes: '', tags, archived: false,
@@ -119,33 +129,68 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
   pay(clients[1].id, null, ago(28), later.reduce((s, o) => s + o.total, 0), 'Paid everything up to date');
   pay(clients[5].id, null, ago(10), 2000, 'Advance');
 
-  const event = (n: number, days: number, rest: object) =>
-    ({ ...base, id: `demo-stock-${n}`, date: ago(days), note: '', voided: false, ...rest }) as StockEvent;
-  const adjust = (n: number, days: number, type: 'add' | 'remove', classId: string, amount: number, unitCost: number | null, reason = '') =>
-    event(n, days, { type, classId, amount, unitCost, reason });
-  const recipe: Recipe = {
-    ...base, id: 'demo-recipe-yogurt', name: 'Yogurt from milk',
-    inputs: [{ classId: milk.id, amount: 500000 }], outputs: [{ classId: yogurt.id, amount: 10000 }],
-    extras: [{ label: 'Electricity', amount: 1200 }, { label: 'Time', amount: 3000 }],
-    shares: [{ classId: yogurt.id, share: 1 }], archived: false,
+  let seq = 0;
+  const event = (days: number, rest: object) =>
+    ({ ...base, id: `demo-stock-${++seq}`, date: ago(days), note: '', voided: false, ...rest }) as StockEvent;
+  // Cost per base unit of every product: the jars' own cost, then the adds (materials of later transforms).
+  const unitCost = new Map<string, number>();
+  for (const { cls, v } of variants.values()) if (v.kind === 'fixed') unitCost.set(cls.id, v.cost!);
+  const stock: StockEvent[] = [];
+  const add = (days: number, cls: ProductClass, amount: number, cost: number) => {
+    unitCost.set(cls.id, cost);
+    stock.push(event(days, { type: 'add', classId: cls.id, amount, unitCost: cost, reason: '' }));
   };
-  const stock: StockEvent[] = [
-    adjust(1, 122, 'add', parm.id, 30000, 1500),
-    adjust(2, 122, 'add', ryzen.id, 20, 8500),
-    adjust(3, 121, 'add', oil.id, 4000, 900),
-    adjust(4, 62, 'add', milk.id, 600000, 45),
-    event(5, 60, {
-      type: 'transform', inputs: recipe.inputs, outputs: recipe.outputs, recipeId: recipe.id,
-      costs: { mode: 'breakdown', materials: 22500, materialsComplete: true, extras: recipe.extras, total: 26700, allocation: recipe.shares },
-    }),
-    adjust(6, 40, 'remove', parm.id, 450, null, 'waste'),
-    adjust(7, 35, 'add', parm.id, 12000, 1550),
-  ];
+  const recipes: Recipe[] = [];
+  const recipe = (key: string, name: string, inputs: [ProductClass, number][], out: ProductClass, extras: [string, number][]) => {
+    const r: Recipe = {
+      ...base, id: `demo-recipe-${key}`, name, inputs: inputs.map(([c, amount]) => ({ classId: c.id, amount })),
+      outputs: [{ classId: out.id, amount: 1 }], extras: extras.map(([label, amount]) => ({ label, amount })),
+      shares: [{ classId: out.id, share: 1 }], archived: false,
+    };
+    recipes.push(r);
+    return r;
+  };
+  // Runs recipe `r` `times` times (breakdown costs: materials plus the scaled extras).
+  const make = (days: number, r: Recipe, times: number) => {
+    const inputs = r.inputs.map((i) => ({ ...i, amount: i.amount * times }));
+    const decimals = (id: string) => products.find((p) => p.id === id)!.unit.decimals;
+    const materials = Math.round(inputs.reduce((s, i) => s + (i.amount / 10 ** decimals(i.classId)) * unitCost.get(i.classId)!, 0));
+    const extras = r.extras.map((e) => ({ ...e, amount: e.amount * times }));
+    stock.push(event(days, {
+      type: 'transform', inputs, outputs: r.outputs.map((o) => ({ ...o, amount: o.amount * times })), recipeId: r.id,
+      costs: {
+        mode: 'breakdown', materials, materialsComplete: true, extras,
+        total: materials + extras.reduce((s, e) => s + e.amount, 0), allocation: r.shares,
+      },
+    }));
+  };
+  const fill = (key: string, honey: string, size: string, bulkCls: ProductClass, empty: ProductClass, out: ProductClass, kg: number, time: number) =>
+    recipe(key, `Fill ${honey} ${size}`, [[empty, 1], [lid, 1], [bulkCls, kg]], out, [['Labels', 10], ['Time', time]]);
+  const fillF5 = fill('f5', 'Flower', '500g', flowerBulk, emptyJar5, f5, 500, 40);
+  const fillF1 = fill('f1', 'Flower', '1kg', flowerBulk, emptyJar1, f1, 1000, 60);
+  const fillR5 = fill('r5', 'Rosemary', '500g', rosemaryBulk, emptyJar5, r5, 500, 40);
+  const fillR1 = fill('r1', 'Rosemary', '1kg', rosemaryBulk, emptyJar1, r1, 1000, 60);
+  const fillO5 = fill('o5', 'Oak', '500g', oakBulk, emptyJar5, o5, 500, 40);
+  const fillO1 = fill('o1', 'Oak', '1kg', oakBulk, emptyJar1, o1, 1000, 60);
+  const boxRecipe = recipe('box', 'Christmas box', [[f5, 1], [r1, 1], [giftBox, 1]], xmasBox, [['Time', 100]]);
+
+  add(125, flowerBulk, 60000, 650); add(125, rosemaryBulk, 40000, 800); add(125, oakBulk, 25000, 900);
+  add(125, emptyJar5, 200, 35); add(125, emptyJar1, 120, 50); add(125, lid, 320, 12); add(125, giftBox, 20, 150);
+  add(125, pollen, 48, 250); add(125, comb, 14000, 2000);
+  make(122, fillF5, 40); make(122, fillF1, 20);
+  make(121, fillR5, 30); make(121, fillR1, 25);
+  make(100, fillO5, 20); make(100, fillO1, 10);
+  add(80, rosemaryBulk, 10000, 820);
+  add(75, flowerBulk, 20000, 680);
+  make(65, fillF5, 30);
+  stock.push(event(60, { type: 'remove', classId: f5.id, amount: 3, unitCost: null, reason: 'broken' }));
+  make(55, fillR5, 16);
+  make(48, boxRecipe, 10);
 
   const as = (type: RecordType, records: object[]) => records.map((record) => ({ type, record }));
   return [
     ...as('product', products), ...as('client', clients), ...as('order', orders),
-    ...as('payment', payments), ...as('stock', stock), ...as('recipe', [recipe]),
+    ...as('payment', payments), ...as('stock', stock), ...as('recipe', recipes),
   ];
 }
 

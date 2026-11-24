@@ -6,12 +6,14 @@
   import Icon from '../../components/Icon.svelte';
   import Segmented from '../../components/Segmented.svelte';
   import { averageCostAt, materialsCost, otherDifference, outputUnitCosts } from '../../../core/costs.ts';
+  import { fullName } from '../../../core/groups.ts';
   import { formatMoney, formatUnitCost } from '../../../core/money.ts';
   import { formatAmount, parseAmount } from '../../../core/quantity.ts';
   import { recipeYield } from '../../../core/recipes.ts';
   import { stockWarnings, validateTransform } from '../../../core/stock.ts';
   import type { ClassAmount, Decimals, Recipe } from '../../../core/types.ts';
   import { app, freshRecord, localDate, saveRecipe, saveStockEvent, view } from '../../data.svelte.ts';
+  import { groupedOptions, liveName } from './grouping.ts';
   import { go } from '../../router.svelte.ts';
   import { showToast } from '../../toast.svelte.ts';
   import {
@@ -107,7 +109,7 @@
     return formatAmount(v, c?.unit.decimals ?? 0, c?.unit.name ?? '');
   };
   const unitOf = (id: string) => view.classesById.get(id)?.unit.name ?? '';
-  const nameOf = (id: string) => view.classesById.get(id)?.name ?? '';
+  const nameOf = (id: string) => liveName(view.classesById, id, '');
 
   const yieldText = $derived.by(() => {
     const i = ins[0];
@@ -212,7 +214,15 @@
               onchange={(e) => setClass(side, i, e.currentTarget.value)}
             >
               <option value="" disabled>Choose…</option>
-              {#each classes as c (c.id)}<option value={c.id}>{c.name}</option>{/each}
+              {#each groupedOptions(classes) as g (g.path)}
+                {#if g.path}
+                  <optgroup label={g.path.replaceAll('/', ' - ')}>
+                    {#each g.items as c (c.id)}<option value={c.id}>{fullName(c)}</option>{/each}
+                  </optgroup>
+                {:else}
+                  {#each g.items as c (c.id)}<option value={c.id}>{fullName(c)}</option>{/each}
+                {/if}
+              {/each}
             </select>
             <div class="amt">
               <button type="button" class="step" aria-label="{side === 'in' ? 'Input' : 'Output'} {i + 1} less" onclick={() => stepRow(side, i, -1)}>−</button>

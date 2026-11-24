@@ -50,6 +50,10 @@ describe('buildLine', () => {
     const l = buildLine(cls, varV, { amount: 1370, unitPrice: 2000, classAvgCost: 1.5 }, 'L2');
     expect(l).toMatchObject({ quantity: null, amount: 1370, unitPrice: 2000, unitCost: 1.5, lineTotal: 2740 });
   });
+  it('snapshots the full name of a grouped product (D-015)', () => {
+    const l = buildLine({ ...cls, name: '500g Jar', group: 'Honey/Rosemary' }, fixedV, { quantity: 1, classAvgCost: null }, 'L3');
+    expect(l.className).toBe('Honey - Rosemary - 500g Jar');
+  });
 });
 
 describe('dropEmptyLines', () => {

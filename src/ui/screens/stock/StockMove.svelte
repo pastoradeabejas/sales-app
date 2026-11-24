@@ -4,6 +4,7 @@
   import EmptyState from '../../components/EmptyState.svelte';
   import Header from '../../components/Header.svelte';
   import Segmented from '../../components/Segmented.svelte';
+  import { fullName } from '../../../core/groups.ts';
   import { formatUnitCost, parseUnitCost } from '../../../core/money.ts';
   import { formatAmount, parseAmount } from '../../../core/quantity.ts';
   import { app, freshRecord, localDate, saveStockEvent, view } from '../../data.svelte.ts';
@@ -72,7 +73,7 @@
       note: note.trim(),
       voided: false,
     });
-    showToast(`${type === 'add' ? 'Added' : 'Removed'} ${fmt(amount)} ${cls.name}`);
+    showToast(`${type === 'add' ? 'Added' : 'Removed'} ${fmt(amount)} ${fullName(cls)}`);
     go('#/stock');
   }
 </script>
@@ -118,7 +119,7 @@
 
     {#if cls}
       <section class="preview" class:negative={preview.after < 0} aria-live="polite">
-        <span class="muted">{cls.name}</span>
+        <span class="muted">{fullName(cls)}</span>
         <span class="amount">{fmt(preview.before)} → <span class:owed-text={preview.after < 0}>{fmt(preview.after)}</span></span>
       </section>
       {#if preview.reset}<p class="hint">Stock is negative: this add counts from 0 (negative reset to 0).</p>{/if}
@@ -168,7 +169,7 @@
 {/if}
 
 <ConfirmSheet bind:open={confirm} title="Remove below zero?" confirmLabel="Remove anyway" danger onconfirm={save}>
-  <p>{cls?.name} stock would be {fmt(preview.after)}. Save anyway?</p>
+  <p>{cls ? fullName(cls) : ''} stock would be {fmt(preview.after)}. Save anyway?</p>
 </ConfirmSheet>
 
 <style>

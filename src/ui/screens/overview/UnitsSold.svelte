@@ -4,11 +4,13 @@
   import ChartLegend from '../../charts/ChartLegend.svelte';
   import Icon from '../../components/Icon.svelte';
   import { app, view } from '../../data.svelte.ts';
+  import { liveName } from '../stock/grouping.ts';
   import SeriesSheet from './SeriesSheet.svelte';
   import { splitText, unitsText, variantText } from './logic.ts';
 
   let { range }: { range: Range } = $props();
 
+  const nameOf = (c: ClassSold) => liveName(view.classesById, c.classId, c.className);
   const classes = $derived(unitsSold(app.orders, view.balances, range));
   let expanded = $state<Record<string, boolean>>({});
   let sheetOpen = $state(false);
@@ -20,11 +22,11 @@
 {#each classes as c (c.classId)}
   <div class="cls">
     <div class="head">
-      <button type="button" class="name" onclick={() => { sheetClassId = c.classId; sheetOpen = true; }} aria-label="{c.className}, {unitsText(c)}. Show chart">
-        <span class="title">{c.className}</span>
+      <button type="button" class="name" onclick={() => { sheetClassId = c.classId; sheetOpen = true; }} aria-label="{nameOf(c)}, {unitsText(c)}. Show chart">
+        <span class="title">{nameOf(c)}</span>
         <span class="amount">{unitsText(c)}</span>
       </button>
-      <button type="button" class="toggle" aria-expanded={!!expanded[c.classId]} aria-label="Variants of {c.className}" onclick={() => (expanded[c.classId] = !expanded[c.classId])}>
+      <button type="button" class="toggle" aria-expanded={!!expanded[c.classId]} aria-label="Variants of {nameOf(c)}" onclick={() => (expanded[c.classId] = !expanded[c.classId])}>
         <Icon name={expanded[c.classId] ? 'up' : 'down'} />
       </button>
     </div>

@@ -1,5 +1,6 @@
 // Pure helpers for the Orders screens (list, form, detail).
 import { normalizeName } from '../../../core/clients.ts';
+import { fullName } from '../../../core/groups.ts';
 import { formatMoney } from '../../../core/money.ts';
 import { buildLine } from '../../../core/orders.ts';
 import { allocateClient, type OrderStatus } from '../../../core/payments.ts';
@@ -172,7 +173,7 @@ export function productGroups(classes: ProductClass[], orders: Order[], include:
       return { cls, variants };
     })
     .filter((g) => g.variants.length > 0)
-    .sort((a, b) => recent(a.cls, b.cls) || a.cls.name.localeCompare(b.cls.name));
+    .sort((a, b) => recent(a.cls, b.cls) || fullName(a.cls).localeCompare(fullName(b.cls)));
 }
 
 /** Stock change per class of saving these lines; an edited order's old lines are given back. */
@@ -188,7 +189,7 @@ export function stockDelta(lines: OrderLine[], oldLines: OrderLine[] = []): Map<
 export function stockWarningText(warnings: { classId: Id; after: Scaled }[], classesById: Map<Id, ProductClass>): string {
   const parts = warnings.map((w) => {
     const cls = classesById.get(w.classId);
-    return cls ? `${cls.name} stock would be ${formatAmount(w.after, cls.unit.decimals, cls.unit.name, { fixed: true })}.` : '';
+    return cls ? `${fullName(cls)} stock would be ${formatAmount(w.after, cls.unit.decimals, cls.unit.name, { fixed: true })}.` : '';
   });
   return `${parts.filter(Boolean).join(' ')} Save anyway?`;
 }
