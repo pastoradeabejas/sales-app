@@ -11,6 +11,7 @@ import {
   inRange,
   owedSummary,
   profit,
+  profitSummary,
   rangeFor,
   revenue,
   timeSeries,
@@ -274,5 +275,42 @@ describe('profit', () => {
     expect(profit([o], may).cost).toBe(101);
     expect(profit([], may)).toEqual({ revenueWithCost: 0, cost: 0, profit: 0, coveredShare: 0 });
     expect(profit([o], may, { classId: 'other' }).coveredShare).toBe(0);
+  });
+});
+
+describe('profitSummary (§16.6)', () => {
+  const cls = (id: string, trackStock: boolean, sellable: boolean) => ({ id, trackStock, sellable }) as any;
+  const classes = new Map([['lid', cls('lid', true, false)], ['fuel', cls('fuel', false, false)], ['honey', cls('honey', true, true)]]);
+  const pl = (classId: string, lineTotal: number) => ({ lineId: 'x', classId, className: classId, unitName: 'pcs', decimals: 0, amount: 1, lineTotal });
+  const purchase = (id: string, date: string, lines: ReturnType<typeof pl>[], voided = false) => ({
+    id, schema: 1, date, supplierId: null, supplierName: '', lines, total: lines.reduce((s, l) => s + l.lineTotal, 0),
+    method: 'cash', note: '', voided, ...stamp,
+  }) as any;
+  const transform = (id: string, date: string, labour: number[], voided = false) => ({
+    id, schema: 1, date, type: 'transform', inputs: [], outputs: [], recipeId: null, note: '', voided, ...stamp,
+    costs: { mode: 'breakdown', materials: 0, materialsComplete: true, extras: [], total: 0, allocation: [],
+      labour: labour.map((amount) => ({ levelId: 'L', levelName: 'L', minutes: 1, hourlyRate: 1, amount })) },
+  }) as any;
+
+  it('sales, cost of goods, gross, expenses, net, labour and spent over the range', () => {
+    const orders = [
+      order('o1', '2026-05-03', 'a', [jar(4, 300), jar(2)]), // 2000 with cost 1200, 1000 unknown
+      order('o2', '2026-06-01', 'a', [jar(1, 300)]), // outside
+      order('o3', '2026-05-09', 'a', [jar(10, 300)], { voided: true }),
+    ];
+    const purchases = [
+      purchase('p1', '2026-05-02', [pl('lid', 13500), pl('fuel', 4000)]),
+      purchase('p2', '2026-05-20', [pl('fuel', 2500)]),
+      purchase('p3', '2026-05-21', [pl('fuel', 9999)], true),
+      purchase('p4', '2026-04-30', [pl('fuel', 1000)]),
+    ];
+    const events = [transform('t1', '2026-05-05', [8000, 169]), transform('t2', '2026-05-06', [500], true), transform('t3', '2026-06-01', [700])];
+    expect(profitSummary(orders, purchases, events, classes, may)).toEqual({
+      sales: 3000, cogs: 1200, coveredShare: 2000 / 3000, gross: 800,
+      expenses: 6500, net: -5700, labour: 8169, spent: 20000,
+    });
+  });
+  it('is all zero with no records', () => {
+    expect(profitSummary([], [], [], classes, may)).toEqual({ sales: 0, cogs: 0, coveredShare: 0, gross: 0, expenses: 0, net: 0, labour: 0, spent: 0 });
   });
 });
