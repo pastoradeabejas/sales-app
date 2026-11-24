@@ -10,6 +10,10 @@ type Unit = { name: string; decimals: Decimals };
 type RecipeLike = { name: string; archived: boolean; inputs: ClassAmount[]; outputs: ClassAmount[] };
 
 export const COLLAPSED_KEY = 'productsCollapsed';
+export const VIEW_KEY = 'productsView';
+
+/** Products view kept per device (D-017): 'table' or, by default, 'cards'. */
+export const parseView = (raw: string | null): 'cards' | 'table' => (raw === 'table' ? 'table' : 'cards');
 
 /** Collapsed group paths from localStorage text; anything malformed → []. */
 export function parseCollapsed(raw: string | null): string[] {

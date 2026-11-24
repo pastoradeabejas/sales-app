@@ -26,14 +26,19 @@ describe('demoRecords', () => {
     expect(ids.every((id) => id.startsWith('demo-'))).toBe(true);
   });
 
-  it('has the honey shop catalogue in groups, clients and recipes', () => {
+  it('has the farm shop catalogue (honey, dairy, meat) in groups, clients and recipes', () => {
     expect(products.map(fullName)).toEqual([
       'Honey - Flower - Bulk', 'Honey - Flower - 500g Jar', 'Honey - Flower - 1kg Jar',
       'Honey - Rosemary - Bulk', 'Honey - Rosemary - 500g Jar', 'Honey - Rosemary - 1kg Jar',
       'Honey - Oak - Bulk', 'Honey - Oak - 500g Jar', 'Honey - Oak - 1kg Jar',
       'Packaging - Empty jar 500g', 'Packaging - Empty jar 1kg', 'Packaging - Lid', 'Packaging - Gift box',
       'Gifts - Christmas box', 'Honeycomb - Honeycomb', 'Pollen - 250g Jar',
+      'Dairy - Milk - Raw milk', 'Dairy - Milk - 1L Bottle', 'Dairy - Cheese - Cured cheese', 'Dairy - Cheese - Fresh cheese',
+      'Dairy - Yogurt - Natural yogurt', 'Meat - Pork - Chorizo', 'Meat - Pork - Pork loin', 'Meat - Beef - Minced beef',
+      'Meat - Beef - Steak',
     ]);
+    expect(products.find((p) => p.name === 'Natural yogurt')!.variants.map((v) => `${v.label}/${v.baseAmount}`)).toEqual(['Single/1', 'Pack of 4/4']);
+    expect(products.find((p) => p.name === 'Cured cheese')!.variants.map((v) => `${v.label}/${v.kind}`)).toEqual(['By weight/variable', 'Quarter 750 g/fixed']);
     expect(products.find((p) => fullName(p) === 'Honey - Flower - Bulk')).toMatchObject({ sellable: false, unit: { name: 'kg', decimals: 3 } });
     const jar = products.find((p) => fullName(p) === 'Honey - Rosemary - 500g Jar')!;
     expect(jar).toMatchObject({ sellable: true, unit: { name: 'jar', decimals: 0 }, lowStockThreshold: 10 });
@@ -42,10 +47,14 @@ describe('demoRecords', () => {
     expect(clients.map((c) => c.name)).toEqual(['Marta', 'Lucía', 'Javier', 'Ana', 'Pedro', 'Carmen', 'Luis']);
     expect(recipes.map((r) => r.name)).toEqual([
       'Fill Flower 500g', 'Fill Flower 1kg', 'Fill Rosemary 500g', 'Fill Rosemary 1kg', 'Fill Oak 500g', 'Fill Oak 1kg', 'Christmas box',
+      'Make cured cheese', 'Make fresh cheese', 'Bottle milk', 'Make yogurt',
     ]);
     const names = (r: Recipe) => r.inputs.map((i) => `${i.amount} ${fullName(products.find((p) => p.id === i.classId)!)}`);
     expect(names(recipes[0])).toEqual(['1 Packaging - Empty jar 500g', '1 Packaging - Lid', '500 Honey - Flower - Bulk']);
     expect(names(recipes[6])).toEqual(['1 Honey - Flower - 500g Jar', '1 Honey - Rosemary - 1kg Jar', '1 Packaging - Gift box']);
+    const cheese = recipes.find((r) => r.name === 'Make cured cheese')!;
+    expect(names(cheese)).toEqual(['10 Dairy - Milk - Raw milk']);
+    expect(cheese.outputs[0].amount).toBe(1000);
   });
 
   it('never lets any stock go below zero over time', () => {

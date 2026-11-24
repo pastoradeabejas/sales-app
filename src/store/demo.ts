@@ -30,6 +30,12 @@ const ORDERS: [number, number, string, 'P' | 'H' | 'U' | 'L' | 'V'][] = [
   [23, 4, 'comb:1580 o1:1', 'U'], [20, 5, 'box:3', 'P'], [16, 0, 'r1:2 f5:1', 'H'], [13, 1, 'pol:5', 'P'],
   [9, 6, 'comb:930', 'U'], [6, 3, 'box:2 pol:2', 'U'], [3, 0, 'f5:2 r5:2', 'U'], [1, 4, 'r1:1', 'P'],
   [0, 2, 'comb:1137', 'U'],
+  // Dairy and meat (D-017).
+  [115, 0, 'mk:4 y4:2', 'P'], [107, 2, 'chw:1250 fc:2', 'P'], [101, 4, 'cho:2 pl:1500', 'P'], [94, 6, 'mk:6 chq:1', 'H'],
+  [86, 3, 'mbf:1000 y1:6', 'P'], [79, 1, 'fc:3 mk:3', 'L'], [71, 5, 'chw:800 cho:1', 'P'], [62, 0, 'y4:3 mk:4', 'P'],
+  [52, 2, 'mb5:2 pl:1200', 'U'], [38, 4, 'stk:900 mk:2', 'P'], [31, 6, 'chq:2 fc:2', 'P'], [24, 3, 'stk:1100 mbf:600', 'H'],
+  [17, 0, 'y4:2 cho:3', 'P'], [11, 0, 'mk:6 fc:2', 'U'], [5, 2, 'chw:640 stk:500', 'P'], [2, 5, 'mb5:1 y1:4', 'P'],
+  [0, 6, 'mk:3 cho:1', 'U'],
 ];
 
 const CLIENTS: [string, string, string[]][] = [
@@ -82,8 +88,22 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
   const xmasBox = product(14, 'Gifts', 'Christmas box', 'pcs', 0, 3, true, [['box', 'Box', 1, 2500, 1520]]);
   const comb = product(15, 'Honeycomb', 'Honeycomb', 'kg', 3, 2000, true, [['comb', 'By weight', null, 3000, 2000]]);
   const pollen = product(16, 'Pollen', '250g Jar', 'jar', 0, 8, true, [['pol', '250 g', 1, 700, 250]]);
+  const rawMilk = product(17, 'Dairy/Milk', 'Raw milk', 'L', 0, 50, false, []);
+  const bottle = product(18, 'Dairy/Milk', '1L Bottle', 'bottle', 0, 10, true, [['mk', '1 L', 1, 180, 90]]);
+  const curedCheese = product(19, 'Dairy/Cheese', 'Cured cheese', 'kg', 3, 2000, true, [
+    ['chw', 'By weight', null, 1800, 900], ['chq', 'Quarter 750 g', 750, 1350, 700],
+  ]);
+  const freshCheese = product(20, 'Dairy/Cheese', 'Fresh cheese', 'pcs', 0, 6, true, [['fc', '250 g', 1, 350, 160]]);
+  const yogurt = product(21, 'Dairy/Yogurt', 'Natural yogurt', 'pot', 0, 10, true, [['y1', 'Single', 1, 90, 40], ['y4', 'Pack of 4', 4, 320, 160]]);
+  const chorizo = product(22, 'Meat/Pork', 'Chorizo', 'pcs', 0, 5, true, [['cho', 'Piece', 1, 650, 380]]);
+  const porkLoin = product(23, 'Meat/Pork', 'Pork loin', 'kg', 3, 3000, true, [['pl', 'By weight', null, 1100, 700]]);
+  const minced = product(24, 'Meat/Beef', 'Minced beef', 'kg', 3, 2000, true, [
+    ['mbf', 'By weight', null, 1300, 850], ['mb5', '500 g pack', 500, 700, 430],
+  ]);
+  const steak = product(25, 'Meat/Beef', 'Steak', 'kg', 3, 1000, true, [['stk', 'By weight', null, 2600, 1700]]);
   const products = [
     flowerBulk, f5, f1, rosemaryBulk, r5, r1, oakBulk, o5, o1, emptyJar5, emptyJar1, lid, giftBox, xmasBox, comb, pollen,
+    rawMilk, bottle, curedCheese, freshCheese, yogurt, chorizo, porkLoin, minced, steak,
   ];
 
   const clients: Client[] = CLIENTS.map(([name, phone, tags]) => ({
@@ -141,10 +161,10 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
     stock.push(event(days, { type: 'add', classId: cls.id, amount, unitCost: cost, reason: '' }));
   };
   const recipes: Recipe[] = [];
-  const recipe = (key: string, name: string, inputs: [ProductClass, number][], out: ProductClass, extras: [string, number][]) => {
+  const recipe = (key: string, name: string, inputs: [ProductClass, number][], out: ProductClass, extras: [string, number][], outAmount = 1) => {
     const r: Recipe = {
       ...base, id: `demo-recipe-${key}`, name, inputs: inputs.map(([c, amount]) => ({ classId: c.id, amount })),
-      outputs: [{ classId: out.id, amount: 1 }], extras: extras.map(([label, amount]) => ({ label, amount })),
+      outputs: [{ classId: out.id, amount: outAmount }], extras: extras.map(([label, amount]) => ({ label, amount })),
       shares: [{ classId: out.id, share: 1 }], archived: false,
     };
     recipes.push(r);
@@ -186,6 +206,18 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
   stock.push(event(60, { type: 'remove', classId: f5.id, amount: 3, unitCost: null, reason: 'broken' }));
   make(55, fillR5, 16);
   make(48, boxRecipe, 10);
+
+  // Dairy made from raw milk; meat bought in.
+  const cheeseRecipe = recipe('cheese', 'Make cured cheese', [[rawMilk, 10]], curedCheese, [['Rennet & salt', 150], ['Time', 300]], 1000);
+  const freshRecipe = recipe('fresh', 'Make fresh cheese', [[rawMilk, 2]], freshCheese, [['Time', 30]]);
+  const bottleRecipe = recipe('bottle', 'Bottle milk', [[rawMilk, 1]], bottle, [['Bottle', 40]]);
+  const yogurtRecipe = recipe('yogurt', 'Make yogurt', [[rawMilk, 1]], yogurt, [['Cultures', 20], ['Pots', 80]], 8);
+  add(125, rawMilk, 800, 45); add(125, chorizo, 40, 380);
+  make(120, cheeseRecipe, 20); make(119, freshRecipe, 30); make(118, bottleRecipe, 60); make(118, yogurtRecipe, 20);
+  add(110, porkLoin, 15000, 700); add(110, minced, 12000, 850);
+  add(60, rawMilk, 400, 45);
+  make(58, bottleRecipe, 40); make(57, freshRecipe, 20); make(56, yogurtRecipe, 10);
+  add(40, steak, 8000, 1700);
 
   const as = (type: RecordType, records: object[]) => records.map((record) => ({ type, record }));
   return [

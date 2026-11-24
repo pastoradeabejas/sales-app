@@ -17,7 +17,8 @@
   import CustomFilter from './CustomFilter.svelte';
   import { filterByCustomField } from './customFilter.ts';
   import { priceLabel, sortClasses, sortedVariants } from './logic.ts';
-  import { COLLAPSED_KEY, parseCollapsed, productTree, renameConflicts, toggleCollapsed } from './tree.ts';
+  import { COLLAPSED_KEY, VIEW_KEY, parseCollapsed, parseView, productTree, renameConflicts, toggleCollapsed } from './tree.ts';
+  import { flattenTree } from '../stock/grouping.ts';
 
   let showArchived = $state(false);
   let fieldKey = $state('');
@@ -30,6 +31,24 @@
   const tree = $derived(productTree(classes, fieldKey, fieldText));
   const archived = $derived(filterByCustomField(classes.filter((c) => c.archived), fieldKey, fieldText));
   const archivedCount = $derived(classes.filter((c) => c.archived).length);
+
+  // Cards or a booktabs-style table (D-017), kept per device.
+  function readView() {
+    try {
+      return parseView(localStorage.getItem(VIEW_KEY));
+    } catch {
+      return 'cards';
+    }
+  }
+  let viewMode = $state(readView());
+  function switchView() {
+    viewMode = viewMode === 'table' ? 'cards' : 'table';
+    try {
+      localStorage.setItem(VIEW_KEY, viewMode);
+    } catch {
+      // Storage blocked: the view still switches for this visit.
+    }
+  }
 
   // Recipes (moved here from Stock): list, edit, use, restore archived.
   const recipes = $derived(activeRecipes(app.recipes));
@@ -71,6 +90,9 @@
       // Storage blocked: the state still works for this visit.
     }
   }
+
+  const tableRows = $derived(flattenTree(tree, { collapsed: new Set(collapsed), force: () => false }));
+  const indent = (depth: number) => `${4 + depth * 14}px`;
 
   // Group menu: "+ Product here" or rename / move.
   let menuOpen = $state(false);
@@ -161,8 +183,64 @@
   {#each n.items as c (c.id)}{@render card(c, c.name)}{/each}
 {/snippet}
 
+{#snippet table()}
+  <table class="booktabs">
+    <thead>
+      <tr><th>Product</th><th>Stock</th><th>Price</th><th>Sold</th></tr>
+    </thead>
+    <tbody>
+      {#each tableRows as r (r.kind === 'group' ? `g:${r.node.path}` : r.item.id)}
+        {#if r.kind === 'group'}
+          <tr class="tgroup" class:top={r.depth === 0}>
+            <td colspan="4" style:padding-left={indent(r.depth)}>
+              <span class="tghead">
+                <button type="button" class="tgtoggle" aria-expanded={r.open} onclick={() => toggle(r.node.path)}>
+                  <Icon name={r.open ? 'up' : 'down'} size={14} />
+                  <span class="ellipsis">{r.node.name}</span>
+                  <span class="muted">({r.node.count})</span>
+                </button>
+                <button type="button" class="tmore" aria-label="Group {r.node.name} actions" onclick={() => openMenu(r.node.path)}>
+                  <Icon name="more" size={16} />
+                </button>
+              </span>
+            </td>
+          </tr>
+        {:else}
+          {@const c = r.item}
+          {@const snap = view.snapshot.get(c.id)}
+          {@const s = sold.get(c.id)}
+          {@const vs = sortedVariants(c.variants)}
+          <tr>
+            <td style:padding-left={indent(r.depth)}>
+              <a class="tname" href="#/products/{c.id}">{c.name}</a>
+              {#if c.trackStock && snap && isLowStock(c, snap.stock)}<Tag tone="low">Low</Tag>{/if}
+            </td>
+            <td class="num">{c.trackStock && snap ? formatAmount(snap.stock, c.unit.decimals, c.unit.name) : '—'}</td>
+            <td class="num">{vs.length === 1 ? priceLabel(vs[0], c.unit.name) : vs.length ? '' : '—'}</td>
+            <td class="num">{c.sellable ? formatAmount(s?.amount ?? 0, c.unit.decimals, c.unit.name) : '—'}</td>
+          </tr>
+          {#if vs.length > 1}
+            {#each vs as v (v.id)}
+              {@const x = s?.variants.find((y) => y.variantId === v.id)}
+              <tr class="tvariant" class:greyed={v.archived}>
+                <td style:padding-left={indent(r.depth + 1)}>{v.label}</td>
+                <td></td>
+                <td class="num">{priceLabel(v, c.unit.name)}</td>
+                <td class="num">{v.kind === 'fixed' ? (x?.quantity ?? 0) : formatAmount(x?.amount ?? 0, c.unit.decimals, c.unit.name)}</td>
+              </tr>
+            {/each}
+          {/if}
+        {/if}
+      {/each}
+    </tbody>
+  </table>
+{/snippet}
+
 <Header title="Products">
   {#snippet actions()}
+    <button type="button" class="btn view-btn" aria-label={viewMode === 'table' ? 'Card view' : 'Table view'} onclick={switchView}>
+      <Icon name={viewMode === 'table' ? 'cards' : 'table'} />
+    </button>
     <a class="btn btn-primary" href="#/products/new">+ New class</a>
   {/snippet}
 </Header>
@@ -176,7 +254,7 @@
 
   <CustomFilter {classes} bind:key={fieldKey} bind:text={fieldText} />
 
-  {@render node(tree)}
+  {#if viewMode === 'table'}{@render table()}{:else}{@render node(tree)}{/if}
 
   {#if showArchived}
     {#each archived as c (c.id)}{@render card(c, fullName(c))}{/each}
@@ -257,6 +335,86 @@
 </Sheet>
 
 <style>
+  .view-btn {
+    min-width: var(--tap);
+    padding: 0 10px;
+  }
+  /* LaTeX booktabs look (D-017): serif, top/bottom rules, a mid rule, no vertical lines. */
+  .booktabs {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Latin Modern Roman', 'CMU Serif', Georgia, 'Times New Roman', serif;
+    font-size: var(--fs-small);
+    color: var(--ink);
+    border-top: 2px solid var(--ink);
+    border-bottom: 2px solid var(--ink);
+  }
+  .booktabs th {
+    padding: 8px 4px 6px;
+    text-align: right;
+    font-weight: 700;
+    border-bottom: 1px solid var(--ink);
+  }
+  .booktabs th:first-child {
+    text-align: left;
+  }
+  .booktabs td {
+    padding: 5px 4px;
+    vertical-align: baseline;
+  }
+  .num {
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .tgroup td {
+    padding-top: 8px;
+  }
+  .tgroup.top:not(:first-child) td {
+    border-top: 1px solid var(--divider);
+  }
+  .tghead {
+    display: flex;
+    align-items: center;
+  }
+  .tgtoggle {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    min-height: 32px;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-weight: 700;
+    font-style: italic;
+    text-align: left;
+    cursor: pointer;
+  }
+  .tgroup.top .tgtoggle {
+    font-style: normal;
+  }
+  .tmore {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .tname {
+    color: inherit;
+    text-decoration: none;
+    margin-right: 6px;
+  }
+  .tvariant td {
+    color: var(--muted);
+    padding-top: 1px;
+    padding-bottom: 1px;
+  }
   .pcard {
     display: grid;
     gap: 6px;

@@ -8,6 +8,7 @@ import {
   recipesUsing,
   renameConflicts,
   toggleCollapsed,
+  parseView,
 } from '../../src/ui/screens/products/tree.ts';
 
 const unit = (name: string, decimals: 0 | 1 | 2 | 3) => ({ name, decimals });
@@ -103,4 +104,13 @@ describe('renameConflicts', () => {
     expect(renameConflicts(all, 'Honey/Thyme', 'Honey/Rosemary')).toEqual(['500G JAR']);
   });
   it('is empty when no clash', () => expect(renameConflicts(all, 'Honey/Thyme', 'Honey/Wild')).toEqual([]));
+});
+
+describe('parseView (D-017: cards or table, kept per device)', () => {
+  it('reads "table", anything else is cards', () => {
+    expect(parseView('table')).toBe('table');
+    expect(parseView('cards')).toBe('cards');
+    expect(parseView(null)).toBe('cards');
+    expect(parseView('junk')).toBe('cards');
+  });
 });
