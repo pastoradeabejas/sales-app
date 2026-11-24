@@ -30,6 +30,7 @@ export default defineConfig({
   define: {
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(pkg.version),
     'import.meta.env.VITE_COMMIT': JSON.stringify(process.env.VITE_COMMIT ?? 'dev'),
+    'import.meta.env.VITE_BUILD_TIME': JSON.stringify(new Date().toISOString()),
   },
   test: {
     include: ['tests/**/*.test.ts'],

@@ -1,4 +1,4 @@
-/* Design tokens (spec §10). Light on :root, dark under [data-theme="dark"]. */
+/* Design tokens (spec §10). Light on :root, dark and blue under [data-theme]. */
 :root {
   color-scheme: light;
   --bg: #f4f5f7;
@@ -61,6 +61,32 @@
   --hero-ink: #f2f4f7;
   --hero-muted: #a3aab8;
   --danger: #ff8a7a;
+}
+
+/* Blue: deep navy surfaces, sky-blue accent, a bright blue hero card. */
+:root[data-theme='blue'] {
+  color-scheme: dark;
+  --bg: #0a1830;
+  --surface: #112442;
+  --border: #1f3b64;
+  --divider: #182f53;
+  --ink: #eaf2ff;
+  --muted: #a4b8da;
+  --accent: #5ec4ff;
+  --on-accent: #04203a;
+  --owed: #ffb470;
+  --owed-on-bg: #ffb470;
+  --owed-bg: #2e2620;
+  --owed-bar: #f5a85c;
+  --owed-tag: #45321f;
+  --owed-mid: #d08440;
+  --accent-soft: #15375f;
+  --accent-strong: #a6dcff;
+  --chip: #18325a;
+  --hero: linear-gradient(135deg, #1d4fa3 0%, #1278c9 100%);
+  --hero-ink: #ffffff;
+  --hero-muted: #c3d8f5;
+  --danger: #ff8f80;
 }
 
 *,

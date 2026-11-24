@@ -7,6 +7,7 @@
   import { go } from '../router.svelte.ts';
   import { appearance, setTextScale, setThemePref } from '../theme.svelte.ts';
   import { TEXT_SCALE } from '../textSize.ts';
+  import { formatBuildTime } from '../months.ts';
   import type { ThemePref } from '../theme.ts';
   import { isConfigured } from '../../store/settings.ts';
   import Backup from './settings/Backup.svelte';
@@ -15,12 +16,14 @@
 
 
   const configured = $derived(isConfigured(app.settings));
+  const buildTime = formatBuildTime(import.meta.env.VITE_BUILD_TIME);
   let confirmDemo = $state(false);
   let confirmLeave = $state(false);
 
   const themes: { value: ThemePref; label: string }[] = [
     { value: 'light', label: 'Light' },
     { value: 'dark', label: 'Dark' },
+    { value: 'blue', label: 'Blue' },
     { value: 'system', label: 'System' },
   ];
   let theme = $state(appearance.pref);
@@ -91,7 +94,7 @@
 
   <section class="card">
     <h2>About</h2>
-    <p class="muted">Version {import.meta.env.VITE_APP_VERSION} · build {import.meta.env.VITE_COMMIT.slice(0, 7)}</p>
+    <p class="muted">Version {import.meta.env.VITE_APP_VERSION} · build {import.meta.env.VITE_COMMIT.slice(0, 7)}{buildTime ? ` · ${buildTime}` : ''}</p>
   </section>
 </div>
 
