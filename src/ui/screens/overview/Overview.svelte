@@ -119,8 +119,8 @@
     <div class="list">
       {#each debtors as d (d.clientId)}
         <a class="list-row" href="#/clients/{d.clientId}">
-          <Avatar name={d.clientName} />
-          <span class="grow"><span class="title">{d.clientName}</span><span class="muted">{owedDetail(d.orderCount, d.oldestDays)}</span></span>
+          <Avatar name={view.clientsById.get(d.clientId)?.name ?? d.clientName} />
+          <span class="grow"><span class="title">{view.clientsById.get(d.clientId)?.name ?? d.clientName}</span><span class="muted">{owedDetail(d.orderCount, d.oldestDays)}</span></span>
           <span class="amount owed-text">{formatMoney(d.owed)}</span>
         </a>
       {:else}
@@ -152,8 +152,8 @@
       <div class="list">
         {#each top as c (c.clientId)}
           <a class="list-row" href="#/clients/{c.clientId}">
-            <Avatar name={c.clientName} />
-            <span class="grow title">{c.clientName}</span>
+            <Avatar name={view.clientsById.get(c.clientId)?.name ?? c.clientName} />
+            <span class="grow title">{view.clientsById.get(c.clientId)?.name ?? c.clientName}</span>
             <span class="amount">{formatMoney(c.value)}</span>
           </a>
         {:else}

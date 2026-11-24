@@ -53,7 +53,7 @@
       <div class="list">
         {#each orders as o (o.id)}
           <a class="list-row" href="#/orders/{o.id}">
-            <span class="grow"><span class="title">{o.clientName}</span><span class="muted">{o.date}</span></span>
+            <span class="grow"><span class="title">{view.clientsById.get(o.clientId)?.name ?? o.clientName}</span><span class="muted">{o.date}</span></span>
             <span class="amount">{formatMoney(o.total)}</span>
           </a>
         {:else}
