@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { barGeometry, niceMax, lineGeometry, VIEW } from '../../src/ui/charts/geometry.ts';
 import {
-  bucketLabel, debtSegments, owedDetail, percents, seriesMetric, splitText, unitsText, variantText, viewRange,
+  bucketLabel, debtSegments, owedDetail, parseSection, percents, seriesMetric, splitText, unitsText, variantText, viewRange,
 } from '../../src/ui/screens/overview/logic.ts';
 import type { ClassSold, VariantSold } from '../../src/core/stats.ts';
 
@@ -101,5 +101,14 @@ describe('chart geometry', () => {
     const many = Array.from({ length: 31 }, () => ({ paid: 1, unpaid: 0 }));
     expect(barGeometry(many).labelIdx.length).toBeLessThanOrEqual(7);
     expect(barGeometry(pts).labelIdx).toEqual([0, 1, 2]);
+  });
+});
+
+describe('Overview section buttons (D-032)', () => {
+  it('reads the remembered section, default Who owes', () => {
+    expect(parseSection('top')).toBe('top');
+    expect(parseSection('stock')).toBe('stock');
+    expect(parseSection(null)).toBe('owes');
+    expect(parseSection('nope')).toBe('owes');
   });
 });

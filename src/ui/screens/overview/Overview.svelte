@@ -18,12 +18,35 @@
   import SyncBadge from './SyncBadge.svelte';
   import UnitsSold from './UnitsSold.svelte';
   import { stockLine } from './stockLine.ts';
-  import { owedDetail, viewRange } from './logic.ts';
+  import { SECTION_KEY, owedDetail, parseSection, viewRange, type Section } from './logic.ts';
   import type { RangeKind } from './logic.ts';
 
   let {}: { params?: Record<string, string>; query?: Record<string, string> } = $props();
 
   const today = $derived(localDate());
+
+  // One section at a time under the owed card, remembered per device (D-032).
+  function readSection(): Section {
+    try {
+      return parseSection(localStorage.getItem(SECTION_KEY));
+    } catch {
+      return 'owes';
+    }
+  }
+  let section = $state<Section>(readSection());
+  function pickSection(v: Section) {
+    try {
+      localStorage.setItem(SECTION_KEY, v);
+    } catch {
+      // Storage blocked: the choice still applies for this visit.
+    }
+  }
+  const sectionOptions: { value: Section; label: string }[] = [
+    { value: 'owes', label: 'Who owes' },
+    { value: 'top', label: 'Top clients' },
+    { value: 'units', label: 'Units sold' },
+    { value: 'stock', label: 'Stock' },
+  ];
 
   // Sync button: pulls and pushes data now (not in Demo mode) and checks for a new app version.
   let checking = $state(false);
@@ -80,6 +103,9 @@
 
   <OwedCard />
 
+  <Segmented label="Section" options={sectionOptions} bind:value={section} onchange={pickSection} />
+
+  {#if section === 'owes'}
   <section class="card">
     <div class="section-head">
       <h2>Who owes</h2>
@@ -97,10 +123,12 @@
       {/each}
     </div>
   </section>
+  {/if}
 
+  {#if section === 'units' || section === 'top'}
   <section class="card units">
     <div class="row-between">
-      <h2>Units sold</h2>
+      <h2>{section === 'units' ? 'Units sold' : `Top clients ${rangeNoun}`}</h2>
     </div>
     <Segmented
       label="Range"
@@ -113,10 +141,25 @@
         <div class="field"><label for="ov-to">To</label><input id="ov-to" class="input" type="date" bind:value={customTo} /></div>
       </div>
     {/if}
-    <UnitsSold {range} />
+    {#if section === 'units'}
+      <UnitsSold {range} />
+    {:else}
+      <div class="list">
+        {#each top as c (c.clientId)}
+          <a class="list-row" href="#/clients/{c.clientId}">
+            <Avatar name={c.clientName} />
+            <span class="grow title">{c.clientName}</span>
+            <span class="amount">{formatMoney(c.value)}</span>
+          </a>
+        {:else}
+          <p class="muted">No sales in this range.</p>
+        {/each}
+      </div>
+    {/if}
   </section>
+  {/if}
 
-  {#if stock.length > 0}
+  {#if section === 'stock'}
     <section class="card">
       <div class="section-head">
         <h2>Stock</h2>
@@ -132,25 +175,12 @@
             {#if s.low}<Tag tone="low">Low</Tag>{/if}
             <span class="amount">{formatAmount(s.stock, s.cls.unit.decimals, s.cls.unit.name)}</span>
           </a>
+        {:else}
+          <p class="muted">No products with stock tracking yet.</p>
         {/each}
       </div>
     </section>
   {/if}
-
-  <section class="card">
-    <h2>Top clients {rangeNoun}</h2>
-    <div class="list">
-      {#each top as c (c.clientId)}
-        <a class="list-row" href="#/clients/{c.clientId}">
-          <Avatar name={c.clientName} />
-          <span class="grow title">{c.clientName}</span>
-          <span class="amount">{formatMoney(c.value)}</span>
-        </a>
-      {:else}
-        <p class="muted">No sales in this range.</p>
-      {/each}
-    </div>
-  </section>
 
   <section class="pair">
     <div class="card"><span class="muted">Sales {rangeNoun}</span><span class="big">{formatMoney(sales)}</span></div>
