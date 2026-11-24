@@ -31,8 +31,9 @@
   async function checkNow() {
     checking = true;
     try {
-      await Promise.all([app.settings.demoMode ? undefined : syncNow(), checkAppUpdate()]);
-      showToast(app.settings.demoMode ? 'App checked for updates (Demo mode: no data sync)' : 'Synced and checked for updates');
+      const [, found] = await Promise.all([app.settings.demoMode ? undefined : syncNow(), checkAppUpdate()]);
+      const appText = found ? 'New app version found, loading…' : 'App is up to date';
+      showToast(app.settings.demoMode ? `${appText} (Demo mode: data is not synced)` : `Data synced · ${appText}`);
     } finally {
       checking = false;
     }

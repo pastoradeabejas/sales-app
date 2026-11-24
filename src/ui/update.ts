@@ -5,7 +5,9 @@ export function setRegistration(r: ServiceWorkerRegistration) {
   registration = r;
 }
 
-/** Asks the server for a newer app version; the update banner shows when one is waiting. */
-export async function checkAppUpdate(): Promise<void> {
-  await registration?.update().catch(() => undefined);
+/** Asks the server for a newer app version; true when one was found (the update banner shows once it is ready). */
+export async function checkAppUpdate(): Promise<boolean> {
+  if (!registration) return false;
+  await registration.update().catch(() => undefined);
+  return !!(registration.installing || registration.waiting);
 }
