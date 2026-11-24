@@ -1,7 +1,9 @@
 // Pure helpers for the Profit tab (D-031).
 import { periodRange, type PeriodKind } from '../../../core/finance.ts';
 import type { Range } from '../../../core/stats.ts';
-import type { ChartPoint } from '../../charts/geometry.ts';
+import { MONTHS } from '../../months.ts';
+
+export interface TrendPoint { key: string; label: string; sales: number; costs: number; net: number }
 
 /** "▲ 12 %" / "▼ 5 %" / "0 %", or "—" when there is no base to compare with. */
 export function changeText(pct: number | null): string {
@@ -33,7 +35,6 @@ export function marginText(m: number | null): string {
 
 export const shareText = (share: number) => `${Math.round(share * 100)} %`;
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 /** "2026-11" -> "Nov". */
 export const monthLabel = (ym: string) => MONTHS[Number(ym.slice(5, 7)) - 1];
 
@@ -47,12 +48,7 @@ export function profitRange(kind: PeriodKind, today: string, custom: { from: str
 export const TOP = 10;
 export const topRows = <T>(rows: T[], all: boolean): T[] => (all ? rows : rows.slice(0, TOP));
 
-/** Chart bars: each month's height is sales; costs (cogs + expenses) and net profit split it. A loss shows costs only. */
-export function trendPoints(trend: { month: string; sales: number; cogs: number; expenses: number; net: number }[]): ChartPoint[] {
-  return trend.map((t) => {
-    const paid = Math.max(t.net, 0);
-    const unpaid = t.cogs + t.expenses;
-    return { key: t.month, label: monthLabel(t.month), paid, unpaid, total: paid + unpaid };
-  });
+/** Chart points: each month's sales, costs (cost of goods + expenses) and net profit (negative on a loss). */
+export function trendPoints(trend: { month: string; sales: number; cogs: number; expenses: number; net: number }[]): TrendPoint[] {
+  return trend.map((t) => ({ key: t.month, label: monthLabel(t.month), sales: t.sales, costs: t.cogs + t.expenses, net: t.net }));
 }
-

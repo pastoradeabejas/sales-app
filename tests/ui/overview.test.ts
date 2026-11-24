@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { barGeometry, niceMax, lineGeometry, VIEW } from '../../src/ui/charts/geometry.ts';
+import { barGeometry, niceMax, lineGeometry, profitBarGeometry, VIEW } from '../../src/ui/charts/geometry.ts';
 import {
   bucketLabel, debtSegments, owedDetail, parseSection, toggleSection, percents, seriesMetric, splitText, unitsText, variantText, viewRange,
 } from '../../src/ui/screens/overview/logic.ts';
@@ -115,5 +115,27 @@ describe('Overview section buttons (D-032)', () => {
     expect(toggleSection(null, 'units')).toBe('units');
     expect(toggleSection('units', 'stock')).toBe('stock');
     expect(toggleSection('stock', 'stock')).toBeNull();
+  });
+});
+
+describe('profitBarGeometry', () => {
+  const plotH = VIEW.h - VIEW.top - VIEW.bottom;
+  it('draws sales up from zero and a loss below the zero line', () => {
+    const g = profitBarGeometry([{ sales: 1000, net: 500 }, { sales: 300, net: -300 }]);
+    expect(g.ticks.map((t) => t.value)).toEqual([-500, 0, 1000]);
+    expect(g.zeroY).toBeCloseTo(VIEW.top + (plotH * 2) / 3);
+    const [a, b] = g.bars;
+    expect(a.salesY + a.salesH).toBeCloseTo(g.zeroY);
+    expect(a.netY + a.netH).toBeCloseTo(g.zeroY);
+    expect(a.loss).toBe(false);
+    expect(b.netY).toBeCloseTo(g.zeroY);
+    expect(b.netH).toBeCloseTo((300 / 1500) * plotH);
+    expect(b.loss).toBe(true);
+    expect(a.netX).toBeGreaterThan(a.salesX);
+  });
+  it('keeps the zero line at the bottom without losses', () => {
+    const g = profitBarGeometry([{ sales: 800, net: 200 }, { sales: 0, net: 0 }]);
+    expect(g.ticks.map((t) => t.value)).toEqual([0, 500, 1000]);
+    expect(g.zeroY).toBeCloseTo(VIEW.h - VIEW.bottom);
   });
 });

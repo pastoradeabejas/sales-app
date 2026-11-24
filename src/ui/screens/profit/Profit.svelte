@@ -3,7 +3,7 @@
   import type { PeriodKind } from '../../../core/finance.ts';
   import { formatMoney } from '../../../core/money.ts';
   import { collected, owedSummary, profitSummary } from '../../../core/stats.ts';
-  import StackedBars from '../../charts/StackedBars.svelte';
+  import ProfitBars from '../../charts/ProfitBars.svelte';
   import EmptyState from '../../components/EmptyState.svelte';
   import Header from '../../components/Header.svelte';
   import Segmented from '../../components/Segmented.svelte';
@@ -112,12 +112,12 @@
 
     <section class="card stack">
       <h2>Monthly trend</h2>
-      <StackedBars {points} label="Sales by month" format={formatMoney} selected={picked} onselect={(i) => (picked = picked === i ? null : i)} paidLabel="Net profit" unpaidLabel="Costs" />
+      <ProfitBars {points} format={formatMoney} selected={picked} onselect={(i) => (picked = picked === i ? null : i)} />
       <table class="booktabs">
-        <thead><tr><th>Month</th><th>Sales</th><th>Net</th></tr></thead>
+        <thead><tr><th>Month</th><th>Sales</th><th>Costs</th><th>Net</th></tr></thead>
         <tbody>
           {#each trend as t (t.month)}
-            <tr><td>{monthLabel(t.month)} {t.month.slice(0, 4)}</td><td class="num">{formatMoney(t.sales)}</td><td class="num">{formatMoney(t.net)}</td></tr>
+            <tr><td>{monthLabel(t.month)} {t.month.slice(0, 4)}</td><td class="num">{formatMoney(t.sales)}</td><td class="num">{formatMoney(t.cogs + t.expenses)}</td><td class="num">{formatMoney(t.net)}</td></tr>
           {/each}
         </tbody>
       </table>

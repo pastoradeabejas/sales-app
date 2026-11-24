@@ -45,3 +45,24 @@ export function lineGeometry(points: { total: number }[]) {
   const path = pts.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
   return { max: f.max, ticks: f.ticks, points: pts, band: f.band, labelIdx: f.labelIdx, path };
 }
+
+/** Sales and net profit bars side by side per period; a loss goes below the zero line. */
+export function profitBarGeometry(points: { sales: number; net: number }[]) {
+  const top = niceMax(Math.max(0, ...points.flatMap((p) => [p.sales, p.net])));
+  const lowest = Math.min(0, ...points.map((p) => p.net));
+  const low = lowest < 0 ? niceMax(-lowest) : 0;
+  const f = frame(points.length, top);
+  const scale = (VIEW.h - VIEW.top - VIEW.bottom) / (top + low);
+  const zeroY = VIEW.top + top * scale;
+  const w = Math.min(f.band * 0.35, 12);
+  const bars = points.map((p, i) => {
+    const netH = Math.abs(p.net) * scale;
+    return {
+      cx: f.cx(i), w,
+      salesX: f.cx(i) - w - 1, salesH: p.sales * scale, salesY: zeroY - p.sales * scale,
+      netX: f.cx(i) + 1, netH, netY: p.net < 0 ? zeroY : zeroY - netH, loss: p.net < 0,
+    };
+  });
+  const ticks = (low ? [-low, 0, top] : [0, top / 2, top]).map((value) => ({ value, y: zeroY - value * scale }));
+  return { ticks, zeroY, bars, band: f.band, labelIdx: f.labelIdx };
+}

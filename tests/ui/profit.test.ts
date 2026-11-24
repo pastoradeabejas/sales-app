@@ -55,13 +55,13 @@ describe('topRows', () => {
 });
 
 describe('trendPoints', () => {
-  it('splits each month into costs and net profit', () => {
+  it('gives each month its sales, costs (cost of goods + expenses) and net profit, negative on a loss', () => {
     const [a, b] = trendPoints([
       { month: '2026-10', sales: 1000, cogs: 400, expenses: 100, net: 500 },
       { month: '2026-11', sales: 300, cogs: 200, expenses: 400, net: -300 },
     ]);
-    expect(a).toEqual({ key: '2026-10', label: 'Oct', paid: 500, unpaid: 500, total: 1000 });
-    expect(b).toEqual({ key: '2026-11', label: 'Nov', paid: 0, unpaid: 600, total: 600 });
+    expect(a).toEqual({ key: '2026-10', label: 'Oct', sales: 1000, costs: 500, net: 500 });
+    expect(b).toEqual({ key: '2026-11', label: 'Nov', sales: 300, costs: 600, net: -300 });
   });
 });
 
