@@ -52,7 +52,10 @@
     </section>
   {:else}
     <SyncSettings />
+  {/if}
 
+  {#if !configured}
+    <!-- Demo only before a data repo is connected: it would replace the real data (D-036). -->
     <section class="card stack">
       <h2>Use without sync</h2>
       <p class="muted">Loads sample data so you can try every screen. Sync stays off.</p>
