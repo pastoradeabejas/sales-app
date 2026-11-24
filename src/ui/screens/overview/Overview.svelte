@@ -187,10 +187,11 @@
     </section>
   {/if}
 
-  <section class="pair">
-    <div class="card"><span class="muted">Sales {rangeNoun}</span><span class="big">{formatMoney(sales)}</span></div>
-    <div class="card"><span class="muted">Collected {rangeNoun}</span><span class="big">{formatMoney(paidIn)}</span></div>
-    <div class="card"><span class="muted">Spent {rangeNoun}</span><span class="big">{formatMoney(spent)}</span></div>
+  <section class="pair" aria-label="Money {rangeNoun}">
+    <div class="card"><span class="muted">Sales</span><span class="big">{formatMoney(sales)}</span></div>
+    <div class="card"><span class="muted">Collected</span><span class="big">{formatMoney(paidIn)}</span></div>
+    <div class="card"><span class="muted">Spent</span><span class="big">{formatMoney(spent)}</span></div>
+    <span class="muted range">{rangeNoun[0].toUpperCase() + rangeNoun.slice(1)}</span>
   </section>
 
   <section class="card">
@@ -250,20 +251,24 @@
   }
   .pair {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
   }
-  .pair .card:last-child {
+  .range {
     grid-column: 1 / -1;
+    margin: -2px 4px 0;
+    font-size: var(--fs-small);
   }
   .pair .card {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    padding: 14px;
+    padding: 12px 10px;
+    min-width: 0;
   }
   .big {
-    font-size: 22px;
+    font-size: clamp(14px, 4.2vw, 18px);
+    white-space: nowrap;
     font-weight: 700;
   }
 </style>
