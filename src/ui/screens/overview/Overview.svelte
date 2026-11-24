@@ -11,6 +11,9 @@
   import Segmented from '../../components/Segmented.svelte';
   import Tag from '../../components/Tag.svelte';
   import { app, localDate, view } from '../../data.svelte.ts';
+  import { syncNow } from '../../sync.svelte.ts';
+  import { showToast } from '../../toast.svelte.ts';
+  import { checkAppUpdate } from '../../update.ts';
   import OwedCard from './OwedCard.svelte';
   import ProfitCard from './ProfitCard.svelte';
   import SyncBadge from './SyncBadge.svelte';
@@ -22,6 +25,18 @@
   let {}: { params?: Record<string, string>; query?: Record<string, string> } = $props();
 
   const today = $derived(localDate());
+
+  // Sync button: pulls and pushes data now (not in Demo mode) and checks for a new app version.
+  let checking = $state(false);
+  async function checkNow() {
+    checking = true;
+    try {
+      await Promise.all([app.settings.demoMode ? undefined : syncNow(), checkAppUpdate()]);
+      showToast(app.settings.demoMode ? 'App checked for updates (Demo mode: no data sync)' : 'Synced and checked for updates');
+    } finally {
+      checking = false;
+    }
+  }
   let kind = $state<RangeKind>('month');
   let customFrom = $state('');
   let customTo = $state('');
@@ -49,6 +64,9 @@
 <Header title="Overview">
   {#snippet actions()}
     <SyncBadge />
+    <button type="button" class="icon-btn sync-btn" class:spin={checking} disabled={checking} aria-label="Sync and check for updates" onclick={checkNow}>
+      <Icon name="refresh" />
+    </button>
     <a class="icon-btn" href="#/settings" aria-label="Settings"><Icon name="settings" /></a>
   {/snippet}
 </Header>
@@ -144,6 +162,20 @@
 </div>
 
 <style>
+  .sync-btn {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+  .spin :global(svg) {
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
   .page {
     padding-bottom: calc(var(--nav-h) + 96px);
   }

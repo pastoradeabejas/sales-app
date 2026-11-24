@@ -1,5 +1,6 @@
 <script lang="ts">
   import { registerSW } from 'virtual:pwa-register';
+  import { checkAppUpdate, setRegistration } from '../update.ts';
 
   // Shown when a new service worker is waiting; reloads only on tap (spec §7).
   // Checks for a new version at every load, when the app comes back to the front, and hourly.
@@ -8,7 +9,8 @@
     onNeedRefresh: () => (waiting = true),
     onRegisteredSW: (_url, r) => {
       if (!r) return;
-      const check = () => void r.update().catch(() => undefined);
+      setRegistration(r);
+      const check = () => void checkAppUpdate();
       check();
       setInterval(check, 60 * 60 * 1000);
       document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && check());
