@@ -21,6 +21,17 @@ describe('validateClassName', () => {
     expect(validateClassName('café', all, 'a')).toBeNull();
     expect(validateClassName('old', all)).toBeNull();
   });
+  it('is unique within a group only (D-015)', () => {
+    const grouped = [
+      { id: 'j', name: '500g Jar', group: 'Honey/Rosemary', archived: false },
+      { id: 't', name: 'Lid', archived: false },
+    ];
+    expect(validateClassName('500G jar', grouped, undefined, ' Honey / Rosemary ')).toMatch(/already/);
+    expect(validateClassName('500g Jar', grouped, undefined, 'Honey/Thyme')).toBeNull();
+    expect(validateClassName('500g Jar', grouped)).toBeNull();
+    expect(validateClassName('lid', grouped, undefined, '')).toMatch(/already/);
+    expect(validateClassName('lid', grouped, undefined, 'Packaging')).toBeNull();
+  });
 });
 
 describe('sortClasses', () => {

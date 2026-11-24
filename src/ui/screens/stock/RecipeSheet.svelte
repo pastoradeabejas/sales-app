@@ -6,20 +6,30 @@
   import { parseMoney } from '../../../core/money.ts';
   import { parseAmount } from '../../../core/quantity.ts';
   import { validateTransform } from '../../../core/stock.ts';
+  import { fullName } from '../../../core/groups.ts';
+  import { pickerGroups } from '../products/tree.ts';
   import type { ClassAmount, CostExtra, Decimals, Recipe } from '../../../core/types.ts';
   import { app, freshRecord, saveRecipe, view } from '../../data.svelte.ts';
   import { showToast } from '../../toast.svelte.ts';
   import { cap, equalPercents, percentsToShares, recipeNameError, sharesToPercents, stepAmount, toInputText } from './logic.ts';
 
   // Create or edit a recipe (§3.6a): name, 1-5 inputs and outputs, default extras and output shares.
-  let { open = $bindable(false), recipe = null }: { open: boolean; recipe?: Recipe | null } = $props();
+  // `initialOutput` prefills a new recipe's single output (from a product page, D-015).
+  let {
+    open = $bindable(false),
+    recipe = null,
+    initialOutput,
+  }: { open: boolean; recipe?: Recipe | null; initialOutput?: ClassAmount } = $props();
 
   type Row = { classId: string; text: string };
   const MAX_ROWS = 5;
-  const classes = $derived(app.products.filter((c) => c.trackStock && !c.archived).sort((a, b) => a.name.localeCompare(b.name)));
+  const options = $derived(pickerGroups(app.products.filter((c) => c.trackStock && !c.archived)));
   const decimalsOf = (id: string): Decimals => view.classesById.get(id)?.unit.decimals ?? 0;
   const unitOf = (id: string) => view.classesById.get(id)?.unit.name ?? '';
-  const nameOf = (id: string) => view.classesById.get(id)?.name ?? '';
+  const nameOf = (id: string) => {
+    const c = view.classesById.get(id);
+    return c ? fullName(c) : '';
+  };
   const toRows = (xs: ClassAmount[]): Row[] => xs.map((x) => ({ classId: x.classId, text: toInputText(x.amount, decimalsOf(x.classId)) }));
 
   let name = $state('');
@@ -35,7 +45,7 @@
     const r = recipe;
     name = r?.name ?? '';
     inputs = r ? toRows(r.inputs) : [{ classId: '', text: '' }];
-    outputs = r ? toRows(r.outputs) : [{ classId: '', text: '' }];
+    outputs = r ? toRows(r.outputs) : initialOutput ? toRows([initialOutput]) : [{ classId: '', text: '' }];
     extras = r ? r.extras.map((x) => ({ label: x.label, text: (x.amount / 100).toFixed(2) })) : [];
     shareTexts = r && r.shares.length === r.outputs.length ? sharesToPercents(r.shares) : equalPercents(r ? r.outputs.length : 1);
     tried = false;
@@ -109,7 +119,15 @@
     <div class="row">
       <select class="input" aria-label="{label} product" bind:value={r.classId}>
         <option value="" disabled>Choose…</option>
-        {#each classes as c (c.id)}<option value={c.id}>{c.name}</option>{/each}
+        {#each options as g (g.label)}
+          {#if g.label}
+            <optgroup label={g.label}>
+              {#each g.items as c (c.id)}<option value={c.id}>{fullName(c)}</option>{/each}
+            </optgroup>
+          {:else}
+            {#each g.items as c (c.id)}<option value={c.id}>{fullName(c)}</option>{/each}
+          {/if}
+        {/each}
       </select>
       <div class="amt">
         <button type="button" class="step" aria-label="{label} less" onclick={() => step(r, -1)}>−</button>

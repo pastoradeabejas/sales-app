@@ -6,6 +6,7 @@
   import Segmented from '../../components/Segmented.svelte';
   import ConfirmSheet from '../../components/ConfirmSheet.svelte';
   import VariantSheet from './VariantSheet.svelte';
+  import RecipeSheet from '../stock/RecipeSheet.svelte';
   import {
     app,
     view,
@@ -19,11 +20,12 @@
   import { showToast } from '../../toast.svelte.ts';
   import { formatUnitCost } from '../../../core/money.ts';
   import { formatAmount, parseAmount } from '../../../core/quantity.ts';
+  import { allGroups, fullName, normalizeGroup } from '../../../core/groups.ts';
   import type { CustomField, Decimals, ProductClass, Variant } from '../../../core/types.ts';
   import { fieldKey, moveVariant, priceLabel, sortedVariants, validateClassName, type VariantValue } from './logic.ts';
+  import { inputsSummary, recipesMaking, recipesUsing } from './tree.ts';
 
   let { params = {}, query = {} }: { params?: Record<string, string>; query?: Record<string, string> } = $props();
-  untrack(() => query);
 
   // The router remounts this screen per route, so reading the id once is enough.
   const classId = untrack(() => params.classId ?? params.id);
@@ -38,6 +40,7 @@
     ? newClassDraft()
     : ($state.snapshot(view.classesById.get(classId as string) ?? newClassDraft()) as ProductClass);
   let name = $state(initial.name);
+  let groupText = $state(isNew ? normalizeGroup(untrack(() => query.group)) : normalizeGroup(initial.group));
   let unitName = $state(initial.unit.name);
   let decimals = $state(String(initial.unit.decimals) as '0' | '1' | '2' | '3');
   let trackStock = $state(initial.trackStock);
@@ -55,7 +58,8 @@
   const missing = $derived(!isNew && !stored);
   const locked = $derived(!isNew && decimalsLocked(classId as string));
   const dec = $derived(Number(decimals) as Decimals);
-  const nameError = $derived(validateClassName(name, app.products, stored?.id));
+  const nameError = $derived(validateClassName(name, app.products, stored?.id, groupText));
+  const groups = $derived(allGroups(app.products.filter((c) => !c.archived)));
   const unitError = $derived(unitName.trim() ? null : 'Unit name is required');
   const lowParsed = $derived(lowText.trim() ? parseAmount(lowText, dec) : null);
   const lowError = $derived(trackStock && lowText.trim() && lowParsed === null ? 'Enter an amount greater than 0 or leave empty' : null);
@@ -103,6 +107,7 @@
     const cls: ProductClass = {
       ...base,
       name: name.trim(),
+      group: normalizeGroup(groupText),
       unit: { name: unitName.trim(), decimals: dec },
       trackStock,
       sellable,
@@ -157,6 +162,11 @@
     showToast(t.archived ? 'Variant restored' : 'Variant archived');
   }
 
+  // Recipes that make or use this product (D-015).
+  const making = $derived(classId ? recipesMaking(app.recipes, classId) : []);
+  const using = $derived(classId ? recipesUsing(app.recipes, classId) : []);
+  let recipeOpen = $state(false);
+
   async function toggleClass() {
     if (!stored) return;
     const archived = !stored.archived;
@@ -166,7 +176,7 @@
   }
 </script>
 
-<Header title={isNew ? 'New class' : (stored?.name ?? 'Product')} back="#/products" />
+<Header title={isNew ? 'New class' : stored ? fullName(stored) : 'Product'} back="#/products" />
 
 <div class="page">
   {#if missing}
@@ -183,6 +193,15 @@
         <label for="c-name">Name</label>
         <input id="c-name" class="input" bind:value={name} maxlength="80" autocomplete="off" />
         {#if tried && nameError}<p class="error">{nameError}</p>{/if}
+      </div>
+
+      <div class="field">
+        <label for="c-group">Group</label>
+        <input id="c-group" class="input" list="group-suggestions" bind:value={groupText} maxlength="120" autocomplete="off" placeholder="Top level" />
+        <datalist id="group-suggestions">
+          {#each groups as g (g)}<option value={g}></option>{/each}
+        </datalist>
+        <p class="hint">Use / for subgroups, e.g. Honey/Rosemary</p>
       </div>
 
       <div class="field">
@@ -338,6 +357,50 @@
         </div>
       </section>
 
+      <section class="card">
+        <div class="section-head">
+          <h2>Made from</h2>
+          {#if stored.trackStock}
+            <button type="button" class="btn btn-ghost" onclick={() => (recipeOpen = true)}>+ Recipe for this product</button>
+          {/if}
+        </div>
+        {#if !stored.trackStock}
+          <p class="muted">Turn on Track stock to make this product with a recipe.</p>
+        {:else if !making.length}
+          <p class="muted">No recipe makes this product yet.</p>
+        {/if}
+        <div class="list">
+          {#each making as r (r.id)}
+            <div class="list-row">
+              <span class="grow">
+                <span class="title">{r.name}</span>
+                <span class="muted">{inputsSummary(r.inputs, view.classesById, stored.group ?? '')}</span>
+              </span>
+              <a class="btn" href="#/stock/transform?recipe={encodeURIComponent(r.id)}">Make</a>
+            </div>
+          {/each}
+        </div>
+        {#if using.length}
+          <h3>Used in</h3>
+          <div class="list">
+            {#each using as r (r.id)}
+              <a class="list-row recipe-link" href="#/products/{r.outputs[0]?.classId}">
+                <span class="grow">
+                  <span class="title">{r.name}</span>
+                  <span class="muted">Makes {inputsSummary(r.outputs, view.classesById, stored.group ?? '')}</span>
+                </span>
+                <Icon name="chevron" />
+              </a>
+            {/each}
+          </div>
+        {/if}
+      </section>
+
+      <RecipeSheet
+        bind:open={recipeOpen}
+        initialOutput={{ classId: stored.id, amount: 10 ** stored.unit.decimals }}
+      />
+
       <button type="button" class="btn btn-block {stored.archived ? '' : 'btn-danger'}" onclick={() => (confirmClass = true)}>
         {stored.archived ? 'Restore class' : 'Archive class'}
       </button>
@@ -442,6 +505,15 @@
     min-height: var(--tap);
     justify-content: center;
     cursor: pointer;
+  }
+  h3 {
+    margin: 12px 0 0;
+    font-size: var(--fs-section);
+  }
+  .recipe-link {
+    color: inherit;
+    text-decoration: none;
+    min-height: var(--tap);
   }
   .greyed .title {
     color: var(--muted);
