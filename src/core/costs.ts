@@ -1,5 +1,7 @@
 // Materials, transform costs and average cost lookups (spec §3.6b, D-005).
-import type { ClassAmount, Cents, CostExtra, CostShare, Order, ProductClass, Purchase, StockEvent, TransformCosts, UnitCost } from './types.ts';
+import type {
+  ClassAmount, Cents, CostExtra, CostShare, LabourCost, LabourRow, Order, ProductClass, Purchase, StockEvent, TransformCosts, UnitCost, WorkLevel,
+} from './types.ts';
 import { classTimeline, perBaseUnit } from './stock.ts';
 
 // Half-up to whole cents; toPrecision strips float noise such as 7.4999999.
@@ -25,6 +27,20 @@ export function materialsCost(
   };
 }
 
+/** Cost of `minutes` at `hourlyRate` cents per hour, half-up to whole cents (§16.5). */
+export const labourAmount = (minutes: number, hourlyRate: Cents): Cents => roundCents((minutes * hourlyRate) / 60);
+
+/** Labour snapshot for a transform; rows of unknown levels are left out. */
+export function labourCosts(rows: LabourRow[], levelsById: Map<string, Pick<WorkLevel, 'name' | 'hourlyRate'>>): LabourCost[] {
+  return rows.flatMap(({ levelId, minutes }) => {
+    const level = levelsById.get(levelId);
+    if (!level) return [];
+    return [{ levelId, levelName: level.name, minutes, hourlyRate: level.hourlyRate, amount: labourAmount(minutes, level.hourlyRate) }];
+  });
+}
+
+const labourSum = (costs: Pick<TransformCosts, 'labour'>) => (costs.labour ?? []).reduce((s, l) => s + l.amount, 0);
+
 /** True when there is at least one share, each in 0..1, summing to 1 within 1e-9. */
 export function sharesValid(shares: CostShare[]): boolean {
   const total = shares.reduce((s, x) => s + x.share, 0);
@@ -36,6 +52,8 @@ export function buildTransformCosts(input: {
   mode: 'breakdown' | 'total';
   materials: Cents;
   materialsComplete: boolean;
+  /** Labour snapshot (§16.5); omitted by callers from before v1.4. */
+  labour?: LabourCost[];
   extras: CostExtra[];
   enteredTotal?: Cents;
   outputs: ClassAmount[];
@@ -44,13 +62,16 @@ export function buildTransformCosts(input: {
   const { mode, materials, materialsComplete, extras, outputs } = input;
   const allocation = input.shares ?? outputs.map((o) => ({ classId: o.classId, share: 1 / outputs.length }));
   if (!sharesValid(allocation)) throw new Error('shares must add up to 100%');
-  const total = mode === 'breakdown' ? materials + extras.reduce((s, x) => s + x.amount, 0) : roundCents(input.enteredTotal ?? 0);
-  return { mode, materials, materialsComplete, extras, total, allocation };
+  const labour = input.labour;
+  const total = mode === 'breakdown'
+    ? materials + labourSum({ labour }) + extras.reduce((s, x) => s + x.amount, 0)
+    : roundCents(input.enteredTotal ?? 0);
+  return { mode, materials, materialsComplete, ...(labour ? { labour } : {}), extras, total, allocation };
 }
 
-/** "Other" slot of total mode: total − materials (negative means total is less than materials). */
+/** "Other" slot of total mode: total − materials − labour (negative means the total is less than those). */
 export function otherDifference(costs: TransformCosts): Cents {
-  return costs.total - costs.materials;
+  return costs.total - costs.materials - labourSum(costs);
 }
 
 /** Cents per 1 base unit for each output that has a share; an estimate when materials are incomplete. */

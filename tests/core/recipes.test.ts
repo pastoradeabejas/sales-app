@@ -26,3 +26,10 @@ describe('parseBatches', () => {
     for (const bad of ['', '0', '-1', '1.5', '2,5', 'abc']) expect(parseBatches(bad)).toBeNull();
   });
 });
+
+describe('batch with labour (§16.5)', () => {
+  it('multiplies the minutes of each level', () => {
+    const r = { ...fill, labour: [{ levelId: 'L1', minutes: 40 }, { levelId: 'L2', minutes: 5 }] };
+    expect(batch(r, 10).labour).toEqual([{ levelId: 'L1', minutes: 400 }, { levelId: 'L2', minutes: 50 }]);
+  });
+});

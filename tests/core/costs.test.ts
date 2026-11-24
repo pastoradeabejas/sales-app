@@ -3,6 +3,8 @@ import type { Decimals, ProductClass, StockAdjust, StockTransform, TransformCost
 import {
   averageCostAt,
   buildTransformCosts,
+  labourAmount,
+  labourCosts,
   materialsCost,
   otherDifference,
   outputUnitCosts,
@@ -146,5 +148,44 @@ describe('averageCostAt', () => {
     const tr = transform('2026-11-12', [['milk', 20000]], [['yogurt', 400]], costs);
     expect(averageCostAt(yogurt, [], [...events, tr], all)).toBe(3);
     expect(classTimeline(milk, [], [...events, tr], all).at(-1)).toMatchObject({ balanceAfter: 0, avgCostAfter: 50 });
+  });
+});
+
+describe('labour (§16.5)', () => {
+  const levels = new Map([
+    ['L1', { id: 'L1', name: 'Level 1', hourlyRate: 1200 }],
+    ['L2', { id: 'L2', name: 'Level 2', hourlyRate: 1450 }],
+  ] as const);
+  const out = [{ classId: 'jar', amount: 10 }];
+
+  it('amount = minutes × rate / 60, half-up to cents', () => {
+    expect(labourAmount(400, 1200)).toBe(8000);
+    expect(labourAmount(7, 1450)).toBe(169); // 169.17
+    expect(labourAmount(3, 1450)).toBe(73); // 72.5 -> 73
+    expect(labourAmount(0, 1200)).toBe(0);
+  });
+  it('snapshots each row with the level name and rate; unknown levels are skipped', () => {
+    expect(labourCosts([{ levelId: 'L1', minutes: 400 }, { levelId: 'L2', minutes: 7 }, { levelId: 'X', minutes: 5 }], levels as any)).toEqual([
+      { levelId: 'L1', levelName: 'Level 1', minutes: 400, hourlyRate: 1200, amount: 8000 },
+      { levelId: 'L2', levelName: 'Level 2', minutes: 7, hourlyRate: 1450, amount: 169 },
+    ]);
+  });
+  it('breakdown: total = materials + labour + extras', () => {
+    const labour = labourCosts([{ levelId: 'L1', minutes: 400 }], levels as any);
+    const c = buildTransformCosts({ mode: 'breakdown', materials: 2000, materialsComplete: true, labour, extras: [{ label: 'Labels', amount: 100 }], outputs: out });
+    expect(c.labour).toEqual(labour);
+    expect(c.total).toBe(10100);
+    expect(outputUnitCosts(c, out, new Map([['jar', cls('jar')]]))[0].unitCost).toBe(1010);
+  });
+  it('total mode: other = total − materials − labour', () => {
+    const labour = labourCosts([{ levelId: 'L1', minutes: 400 }], levels as any);
+    const c = buildTransformCosts({ mode: 'total', materials: 2000, materialsComplete: true, labour, extras: [], enteredTotal: 12000, outputs: out });
+    expect(c.total).toBe(12000);
+    expect(otherDifference(c)).toBe(2000);
+  });
+  it('old transforms without labour keep working', () => {
+    const c = buildTransformCosts({ mode: 'total', materials: 2000, materialsComplete: true, extras: [], enteredTotal: 3000, outputs: out });
+    expect('labour' in c).toBe(false);
+    expect(otherDifference(c)).toBe(1000);
   });
 });

@@ -1,12 +1,14 @@
 // Recipes in Transform (spec §3.6a, D-019): a recipe is run a whole number of times.
-import type { ClassAmount } from './types.ts';
+import type { ClassAmount, LabourRow } from './types.ts';
 
-type Batchable = { inputs: ClassAmount[]; outputs: ClassAmount[]; extras: { label: string; amount: number }[] };
+type Batchable = { inputs: ClassAmount[]; outputs: ClassAmount[]; extras: { label: string; amount: number }[]; labour?: LabourRow[] };
 
-/** The recipe's inputs, outputs and cost extras multiplied by `n` batches. */
+/** The recipe's inputs, outputs, cost extras and labour minutes multiplied by `n` batches. */
 export function batch(r: Batchable, n: number): Batchable {
   const times = <T extends { amount: number }>(xs: T[]) => xs.map((x) => ({ ...x, amount: x.amount * n }));
-  return { inputs: times(r.inputs), outputs: times(r.outputs), extras: times(r.extras) };
+  const out: Batchable = { inputs: times(r.inputs), outputs: times(r.outputs), extras: times(r.extras) };
+  if (r.labour) out.labour = r.labour.map((l) => ({ ...l, minutes: l.minutes * n }));
+  return out;
 }
 
 /** Number of batches from text: a whole number from 1, else null. */
