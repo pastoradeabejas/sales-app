@@ -9,6 +9,7 @@
   import { go } from '../../router.svelte.ts';
   import { showToast } from '../../toast.svelte.ts';
   import { formatAmount } from '../../../core/quantity.ts';
+  import { isExpenseItem } from '../../../core/purchases.ts';
   import { isLowStock } from '../../../core/stock.ts';
   import { rangeFor, unitsSold, type ClassSold } from '../../../core/stats.ts';
   import { fullName, normalizeGroup, renameGroup, type GroupNode } from '../../../core/groups.ts';
@@ -136,12 +137,12 @@
       <span class="name">
         <span class="title">{label}</span>
         {#if c.archived}<Tag>Archived</Tag>{/if}
-        {#if !c.sellable}<Tag>raw material</Tag>{/if}
+        {#if isExpenseItem(c)}<Tag>expense</Tag>{:else if !c.sellable}<Tag>raw material</Tag>{/if}
         {#if c.trackStock && snap && isLowStock(c, snap.stock)}<Tag tone="low">Low</Tag>{/if}
       </span>
       {#if c.trackStock && snap}<span class="qty">{formatAmount(snap.stock, c.unit.decimals, c.unit.name)}</span>{/if}
     </div>
-    <span class="muted">Sold this month: {formatAmount(s?.amount ?? 0, c.unit.decimals, c.unit.name)}</span>
+    {#if !isExpenseItem(c)}<span class="muted">Sold this month: {formatAmount(s?.amount ?? 0, c.unit.decimals, c.unit.name)}</span>{/if}
     {#if c.variants.length}
       <div class="variants" role="table" aria-label="Variants of {fullName(c)}">
         {#each sortedVariants(c.variants) as v (v.id)}
@@ -155,7 +156,7 @@
           </div>
         {/each}
       </div>
-    {:else}
+    {:else if !isExpenseItem(c)}
       <span class="muted">{c.sellable ? 'No variants yet' : 'Not sold · used in transforms'}</span>
     {/if}
   </a>
@@ -209,14 +210,16 @@
           {@const c = r.item}
           {@const snap = view.snapshot.get(c.id)}
           {@const vs = sortedVariants(c.variants)}
+          {@const exp = isExpenseItem(c)}
           <tr>
             <td style:padding-left={indent(r.depth)}>
               <a class="tname" href="#/products/{c.id}">{c.name}</a>
+              {#if exp}<Tag>expense</Tag>{/if}
               {#if c.trackStock && snap && isLowStock(c, snap.stock)}<Tag tone="low">Low</Tag>{/if}
             </td>
             <td class="num">{c.trackStock && snap ? formatAmount(snap.stock, c.unit.decimals, c.unit.name) : '—'}</td>
-            <td class="num">{vs.length === 1 ? priceLabel(vs[0], c.unit.name) : vs.length ? '' : '—'}</td>
-            <td class="num">{costLabel(vs.length === 1 ? vs[0] : null, snap?.avgCost ?? null, c.unit.decimals, c.unit.name)}</td>
+            <td class="num">{exp ? '—' : vs.length === 1 ? priceLabel(vs[0], c.unit.name) : vs.length ? '' : '—'}</td>
+            <td class="num">{exp ? '—' : costLabel(vs.length === 1 ? vs[0] : null, snap?.avgCost ?? null, c.unit.decimals, c.unit.name)}</td>
           </tr>
           {#if vs.length > 1}
             {#each vs as v (v.id)}

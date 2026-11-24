@@ -242,6 +242,10 @@ describe('chartModel', () => {
   ];
   const t = classTimeline(milk, [], events, byId);
 
+  it('marks a purchase like an add', () => {
+    const purchase = { ...t[0], kind: 'purchase' as const };
+    expect(chartModel([purchase], '2026-11-10', 200, 100, 10)!.markers.map((k) => k.kind)).toEqual(['add']);
+  });
   it('null without movements', () => {
     expect(chartModel([], '2026-11-22')).toBeNull();
   });

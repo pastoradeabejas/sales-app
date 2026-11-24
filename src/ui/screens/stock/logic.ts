@@ -245,7 +245,7 @@ export function chartModel(timeline: Movement[], today: string, w = 340, h = 120
   for (const m of timeline) {
     if (days[days.length - 1]?.date === m.date) days[days.length - 1].balance = m.balanceAfter;
     else days.push({ date: m.date, balance: m.balanceAfter });
-    const k = m.kind === 'add' ? 'add' : m.kind.startsWith('transform') ? 'transform' : null;
+    const k = m.kind === 'add' || m.kind === 'purchase' ? 'add' : m.kind.startsWith('transform') ? 'transform' : null;
     if (k) kinds.set(m.date, (kinds.get(m.date) ?? new Set()).add(k));
   }
   const first = days[0].date;

@@ -18,6 +18,7 @@
   } from '../../data.svelte.ts';
   import { go } from '../../router.svelte.ts';
   import { showToast } from '../../toast.svelte.ts';
+  import { isExpenseItem } from '../../../core/purchases.ts';
   import { formatUnitCost } from '../../../core/money.ts';
   import { formatAmount, parseAmount } from '../../../core/quantity.ts';
   import { allGroups, fullName, normalizeGroup } from '../../../core/groups.ts';
@@ -55,6 +56,14 @@
     Object.fromEntries(initial.customFields.map((f) => [f.key, String(initial.customValues[f.key] ?? '')])),
   );
   let tried = $state(false);
+  // Kind (§16.3): an expense item has no stock, price or variants.
+  let kind = $state<'product' | 'expense'>(isExpenseItem(initial) ? 'expense' : 'product');
+  const expense = $derived(kind === 'expense');
+  function onKind(k: 'product' | 'expense') {
+    trackStock = k === 'product';
+    sellable = k === 'product';
+    if (k === 'expense' && !groupText.trim()) groupText = 'Expenses';
+  }
 
   const missing = $derived(!isNew && !stored);
   const locked = $derived(!isNew && decimalsLocked(classId as string));
@@ -190,6 +199,18 @@
         save();
       }}
     >
+      {#if isNew}
+        <Segmented
+          label="Kind"
+          options={[
+            { value: 'product', label: 'Product' },
+            { value: 'expense', label: 'Expense item' },
+          ]}
+          bind:value={kind}
+          onchange={onKind}
+        />
+      {/if}
+
       <div class="field">
         <label for="c-name">Name</label>
         <input id="c-name" class="input" bind:value={name} maxlength="80" autocomplete="off" />
@@ -240,6 +261,7 @@
         {#if tried && unitError}<p class="error">{unitError}</p>{/if}
       </div>
 
+      {#if !expense}
       <div class="field">
         <span class="label">Decimals</span>
         {#if locked}
@@ -273,6 +295,8 @@
           <input id="c-low" class="input" bind:value={lowText} inputmode="decimal" placeholder="No warning" autocomplete="off" />
           {#if tried && lowError}<p class="error">{lowError}</p>{/if}
         </div>
+      {/if}
+
       {/if}
 
       <div class="field">
@@ -313,6 +337,7 @@
     </form>
 
     {#if stored}
+      {#if !expense}
       <section class="card">
         <div class="section-head">
           <h2>Variants</h2>
@@ -419,6 +444,8 @@
         bind:open={recipeOpen}
         initialOutput={{ classId: stored.id, amount: 10 ** stored.unit.decimals }}
       />
+
+      {/if}
 
       <button type="button" class="btn btn-block {stored.archived ? '' : 'btn-danger'}" onclick={() => (confirmClass = true)}>
         {stored.archived ? 'Restore class' : 'Archive class'}
