@@ -2,7 +2,8 @@
   import { formatMoney } from '../../../core/money.ts';
   import { profit } from '../../../core/stats.ts';
   import type { Range } from '../../../core/stats.ts';
-  import { app } from '../../data.svelte.ts';
+  import { app, view } from '../../data.svelte.ts';
+  import { liveName } from '../stock/grouping.ts';
   import { profitByClass } from './profitLogic.ts';
 
   let { range }: { range: Range } = $props();
@@ -25,7 +26,7 @@
     <div class="list">
       {#each rows as r (r.classId)}
         <div class="list-row">
-          <span class="grow title">{r.className}</span>
+          <span class="grow title">{liveName(view.classesById, r.classId, r.className)}</span>
           <span class="amount">{formatMoney(r.profit)}</span>
         </div>
       {/each}

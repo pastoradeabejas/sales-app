@@ -12,6 +12,7 @@
   import Icon from '../../components/Icon.svelte';
   import Sheet from '../../components/Sheet.svelte';
   import StatusTag from '../../components/StatusTag.svelte';
+  import { liveName } from '../stock/grouping.ts';
   import ClientSheet from './ClientSheet.svelte';
   import MergeSheet from './MergeSheet.svelte';
   import ReceiveSheet from './ReceiveSheet.svelte';
@@ -102,7 +103,7 @@
           {#each bought as b (b.variantId)}
             <div class="tile">
               <span class="n">{b.quantity !== null ? b.quantity : formatAmount(b.amount, b.decimals as Decimals, b.unitName)}</span>
-              <span class="muted">{b.className} · {b.label}</span>
+              <span class="muted">{liveName(view.classesById, b.classId, b.className)} · {b.label}</span>
             </div>
           {/each}
         </div>

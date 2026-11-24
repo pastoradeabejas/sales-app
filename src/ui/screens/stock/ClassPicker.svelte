@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { fullName } from '../../../core/groups.ts';
   import type { ProductClass } from '../../../core/types.ts';
+  import { groupedOptions, sortByFullName } from './grouping.ts';
 
   // Class choice: chips for a few classes (mockup), a select when there are many.
   let {
@@ -9,6 +11,9 @@
     onchange,
   }: { options: ProductClass[]; value: string; label: string; onchange?: (id: string) => void } = $props();
 
+  const sorted = $derived(sortByFullName(options));
+  const groups = $derived(groupedOptions(options));
+
   function pick(id: string) {
     value = id;
     onchange?.(id);
@@ -17,15 +22,21 @@
 
 {#if options.length <= 8}
   <div class="chips" role="group" aria-label={label}>
-    {#each options as c (c.id)}
-      <button type="button" class:on={value === c.id} aria-pressed={value === c.id} onclick={() => pick(c.id)}>{c.name}</button>
+    {#each sorted as c (c.id)}
+      <button type="button" class:on={value === c.id} aria-pressed={value === c.id} onclick={() => pick(c.id)}>{fullName(c)}</button>
     {/each}
   </div>
 {:else}
   <select class="input" aria-label={label} {value} onchange={(e) => pick(e.currentTarget.value)}>
     <option value="" disabled>Choose…</option>
-    {#each options as c (c.id)}
-      <option value={c.id}>{c.name}</option>
+    {#each groups as g (g.path)}
+      {#if g.path}
+        <optgroup label={g.path.replaceAll('/', ' - ')}>
+          {#each g.items as c (c.id)}<option value={c.id}>{fullName(c)}</option>{/each}
+        </optgroup>
+      {:else}
+        {#each g.items as c (c.id)}<option value={c.id}>{fullName(c)}</option>{/each}
+      {/if}
     {/each}
   </select>
 {/if}

@@ -12,6 +12,7 @@
   import type { OrderLine, Payment, PaymentMethod } from '../../../core/types.ts';
   import { app, view, voidPayment } from '../../data.svelte.ts';
   import { showToast } from '../../toast.svelte.ts';
+  import { liveName } from '../stock/grouping.ts';
   import { formatDay } from './logic.ts';
   import PaymentSheet from './PaymentSheet.svelte';
   import VoidSheet from './VoidSheet.svelte';
@@ -91,7 +92,7 @@
       {#each order.lines as l (l.lineId)}
         <div class="grid line">
           <span class="product">
-            {l.className} {l.variantLabel}
+            {liveName(view.classesById, l.classId, l.className)} {l.variantLabel}
             {#if archived(l)}<Tag tone="neutral">archived</Tag>{/if}
           </span>
           <span class="r">{qtyText(l)}</span>

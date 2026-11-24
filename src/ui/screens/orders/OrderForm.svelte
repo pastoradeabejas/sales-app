@@ -6,6 +6,7 @@
   import Sheet from '../../components/Sheet.svelte';
   import Segmented from '../../components/Segmented.svelte';
   import StatusTag from '../../components/StatusTag.svelte';
+  import { buildTree } from '../../../core/groups.ts';
   import { formatMoney, parseMoney } from '../../../core/money.ts';
   import { isFutureDate, orderTotal, startFromPicks, unitSummary, validateOrder } from '../../../core/orders.ts';
   import { newOrderPayment, previewNewOrder } from '../../../core/payments.ts';
@@ -15,6 +16,8 @@
   import { app, freshRecord, localDate, newId, saveOrder, undoToast, view } from '../../data.svelte.ts';
   import { go } from '../../router.svelte.ts';
   import { showToast } from '../../toast.svelte.ts';
+  import GroupHeader from '../stock/GroupHeader.svelte';
+  import { flattenTree, loadCollapsed, saveCollapsed, toggleCollapsed } from '../stock/grouping.ts';
   import Balance from './Balance.svelte';
   import ClientPicker from './ClientPicker.svelte';
   import StartFrom from './StartFrom.svelte';
@@ -65,6 +68,19 @@
   const index = $derived(variantIndex(app.products));
   const include = $derived(new Set([...(prev?.lines.map((l) => l.variantId) ?? []), ...Object.keys(draft.qty)]));
   const groups = $derived(productGroups(app.products, app.orders, include));
+  const tree = $derived(buildTree(groups.map((g) => ({ name: g.cls.name, group: g.cls.group, g }))));
+  let collapsed = $state(loadCollapsed(localStorage, 'orderCollapsed'));
+  const rows = $derived(
+    flattenTree(tree, {
+      collapsed,
+      force: (x) => x.g.variants.some((v) => (draft.qty[v.id] ?? 0) > 0),
+      order: (a, b) => groups.indexOf(a.g) - groups.indexOf(b.g),
+    }),
+  );
+  function toggle(path: string) {
+    collapsed = toggleCollapsed(collapsed, path);
+    saveCollapsed(localStorage, 'orderCollapsed', collapsed);
+  }
   const avgCost = (classId: Id) => view.snapshot.get(classId)?.avgCost ?? null;
   const lines = $derived(draftLines(draft, index, avgCost, () => '', prev));
   const total = $derived(orderTotal(lines));
@@ -211,8 +227,12 @@
         <a class="btn" href="#/products">Products</a>
       </EmptyState>
     {/if}
-    {#each groups as g (g.cls.id)}
-      <section class="card group">
+    {#each rows as r (r.kind === 'group' ? `g:${r.node.path}` : r.item.g.cls.id)}
+      {#if r.kind === 'group'}
+        <GroupHeader name={r.node.name} count={r.node.count} open={r.open} depth={r.depth} ontoggle={() => toggle(r.node.path)} />
+      {:else}
+      {@const g = r.item.g}
+      <section class="card group" style:margin-left="{r.depth * 12}px">
         <div class="section-head">
           <h2>{g.cls.name}</h2>
           <span class="muted">{stockText(g.cls.id)}</span>
@@ -228,6 +248,7 @@
           />
         {/each}
       </section>
+      {/if}
     {/each}
     {#if groups.length}<p class="hint">Tap a price to change it for this order only.</p>{/if}
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { fullName } from '../../../core/groups.ts';
   import { formatMoney } from '../../../core/money.ts';
   import { formatAmount } from '../../../core/quantity.ts';
   import { collected, revenue, topClients, whoOwes } from '../../../core/stats.ts';
@@ -106,7 +107,7 @@
         {#each stock as s (s.cls.id)}
           <a class="list-row" href="#/stock">
             <span class="grow">
-              <span class="title">{s.cls.name}</span>
+              <span class="title">{fullName(s.cls)}</span>
               <span class="muted">{stockLine(s.cls, s.left, s.last)}</span>
             </span>
             {#if s.low}<Tag tone="low">Low</Tag>{/if}

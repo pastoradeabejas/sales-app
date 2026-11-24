@@ -1,6 +1,7 @@
 // Pure helpers of the Stock screens (§8.9–8.12): previews, reasons, transform rows, shares, costs, texts, chart.
 import { buildTransformCosts, sharesValid } from '../../../core/costs.ts';
 import { formatUnitCost, parseMoney } from '../../../core/money.ts';
+import { fullName } from '../../../core/groups.ts';
 import { formatAmount, parseAmount } from '../../../core/quantity.ts';
 import { scaleRows } from '../../../core/recipes.ts';
 import { daysLeft, type Movement } from '../../../core/stock.ts';
@@ -93,7 +94,10 @@ export function sharesToPercents(shares: CostShare[]): string[] {
 
 const amountOf = (c: ProductClass | undefined, amount: Scaled, sign = '') =>
   `${sign}${formatAmount(amount, c?.unit.decimals ?? 0, c?.unit.name ?? '')}`;
-const nameOf = (classesById: Map<Id, ProductClass>, id: Id) => classesById.get(id)?.name ?? 'Unknown';
+const nameOf = (classesById: Map<Id, ProductClass>, id: Id) => {
+  const c = classesById.get(id);
+  return c ? fullName(c) : 'Unknown';
+};
 
 /** "Milk −500 kg → Yogurt +10,000 pcs". */
 export function transformSummary(inputs: ClassAmount[], outputs: ClassAmount[], classesById: Map<Id, ProductClass>): string {
@@ -248,8 +252,8 @@ export function recentMovements(
     const cost = add && e.unitCost !== null ? ` · ${formatUnitCost(e.unitCost)} / ${c.unit.name}` : '';
     all.push({
       key: e.id, kind: e.type, date: e.date, createdAt: e.createdAt,
-      title: add ? `Add · ${c.name}` : `Remove · ${reasonLabel(e.reason) || 'Other'}`,
-      sub: add ? `${day}${cost}` : `${day} · ${c.name}`, deltas: [amountOf(c, e.amount, add ? '+' : '−')], href: `#/stock/${c.id}`,
+      title: add ? `Add · ${fullName(c)}` : `Remove · ${reasonLabel(e.reason) || 'Other'}`,
+      sub: add ? `${day}${cost}` : `${day} · ${fullName(c)}`, deltas: [amountOf(c, e.amount, add ? '+' : '−')], href: `#/stock/${c.id}`,
     });
   }
   all.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
