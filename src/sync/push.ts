@@ -58,10 +58,11 @@ export async function pushOutbox({ gh, store, deviceName }: SyncDeps): Promise<P
   async function pushEntry(entry: OutboxEntry): Promise<PushStop | null> {
     const { path, recordType: type, recordId: id } = entry;
     const seq = entry.seq!;
+    // In flight before the first await: later saves append a new entry instead of collapsing into this one.
+    store.markInFlight(seq);
     let content = entry.content;
     let sha = (await store.files()).get(path)?.blobSha;
     for (let attempt = 1; ; attempt++) {
-      store.markInFlight(seq);
       try {
         const head = await store.getMeta<string>('lastSyncedCommitSha');
         const message = await commitMessage(deviceName, { recordType: type, content }, lookup);
@@ -73,7 +74,7 @@ export async function pushOutbox({ gh, store, deviceName }: SyncDeps): Promise<P
       } catch (e) {
         if (!(e instanceof GitHubError && e.kind === 'conflict')) return fail(seq, e);
         sum.conflicts++;
-        await store.markAttempt(seq, `Conflict with the remote version (${e.status})`);
+        await store.markAttempt(seq, `Conflict with the remote version (${e.status})`, attempt < MAX_ATTEMPTS);
       }
       if (attempt === MAX_ATTEMPTS) return null;
       try {
@@ -82,14 +83,16 @@ export async function pushOutbox({ gh, store, deviceName }: SyncDeps): Promise<P
         if (!remote) continue;
         const r = resolvePending(content, parseRecord(type, remote.text), type);
         if (r.toast) sum.toasts.push(await conflictToast(type, r.merged, lookup));
+        // An edit saved meanwhile is queued after this entry: the local record is newer, keep it (it merges on its own push).
+        const newer = (await store.outbox()).some((x) => x.path === path && x.seq !== seq);
         if (r.dropOutbox) {
-          await store.applyRemote(type, r.merged, { path, blobSha: remote.sha, recordType: type, recordId: id });
+          if (!newer) await store.applyRemote(type, r.merged, { path, blobSha: remote.sha, recordType: type, recordId: id });
           await store.dropOutboxEntry(seq);
           return null;
         }
         // Keep the old files row until the merged version is pushed, so a give-up re-merges next time.
         const old = (await store.files()).get(path);
-        if (r.toast) await store.applyRemote(type, r.merged, old ?? { path, blobSha: remote.sha, recordType: type, recordId: id });
+        if (r.toast && !newer) await store.applyRemote(type, r.merged, old ?? { path, blobSha: remote.sha, recordType: type, recordId: id });
         content = r.merged;
       } catch (e) {
         return fail(seq, e);

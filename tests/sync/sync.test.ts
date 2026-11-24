@@ -186,6 +186,53 @@ describe('push (§6.2)', () => {
     expect(await store.outboxCount()).toBe(0);
   });
 
+  it('409: an edit saved while the conflict is resolved is still pushed', async () => {
+    const fake = fakeGitHub({ 'clients/c1.json': clientFile(client('c1', 'Marta')) });
+    let store!: ReturnType<typeof device>['store'];
+    let edited = false;
+    const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      if (!edited && (init?.method ?? 'GET') === 'GET' && String(input).includes('/contents/clients/c1.json')) {
+        edited = true;
+        await store.save('client', client('c1', 'Marta newest'));
+      }
+      return fake.fetch(input, init);
+    }) as typeof globalThis.fetch;
+    const d = device(fake);
+    store = d.store;
+    const gh = createGitHub({ repo: 'owner/data', branch: 'main', token: 't', fetch });
+    const deps = { ...d.deps, gh };
+    await pull(deps);
+    await store.save('client', client('c1', 'Marta local'));
+    fake.commitRemote('clients/c1.json', clientFile(client('c1', 'Marta remote', stamp(OLD, 'Phone C'))));
+    await pushOutbox(deps);
+    expect(edited).toBe(true);
+    expect(JSON.parse(fake.files.get('clients/c1.json')!).name).toBe('Marta newest');
+    expect(await store.outboxCount()).toBe(0);
+  });
+
+  it('409: a remote that wins does not overwrite a newer local edit saved meanwhile', async () => {
+    const fake = fakeGitHub({ 'clients/c1.json': clientFile(client('c1', 'Marta')) });
+    let store!: ReturnType<typeof device>['store'];
+    let edited = false;
+    const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      if (!edited && (init?.method ?? 'GET') === 'GET' && String(input).includes('/contents/clients/c1.json')) {
+        edited = true;
+        await store.save('client', client('c1', 'Marta newest'));
+      }
+      return fake.fetch(input, init);
+    }) as typeof globalThis.fetch;
+    const d = device(fake);
+    store = d.store;
+    const deps = { ...d.deps, gh: createGitHub({ repo: 'owner/data', branch: 'main', token: 't', fetch }) };
+    await pull(deps);
+    await store.save('client', client('c1', 'Marta local')); // stamped 10:00:00
+    fake.commitRemote('clients/c1.json', clientFile(client('c1', 'Marta remote', stamp('2026-11-23T10:00:00.500Z', 'Phone B'))));
+    await pushOutbox(deps);
+    expect(JSON.parse(fake.files.get('clients/c1.json')!).name).toBe('Marta newest');
+    expect((await store.get<any>('clients', 'c1'))?.name).toBe('Marta newest');
+    expect(await store.outboxCount()).toBe(0);
+  });
+
   it('409: a newer remote wins, the entry is dropped with a toast', async () => {
     const fake = fakeGitHub({ 'clients/c1.json': clientFile(client('c1', 'Marta')) });
     const { deps, store } = device(fake);

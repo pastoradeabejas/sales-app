@@ -158,9 +158,9 @@ export function createStore(backend: Backend, opts: StoreOptions = {}) {
     outboxCount: async () => (await read(['outbox'], (t) => t.getAll('outbox'))).length,
     /** Marks an entry as being pushed, so later saves append instead of collapsing into it. */
     markInFlight: (seq: number) => void inFlight.add(seq),
-    /** Records a failed push attempt. */
-    markAttempt: async (seq: number, error: string | null) => {
-      inFlight.delete(seq);
+    /** Records a failed push attempt; keepInFlight while the pusher retries the same entry. */
+    markAttempt: async (seq: number, error: string | null, keepInFlight = false) => {
+      if (!keepInFlight) inFlight.delete(seq);
       await write(['outbox'], async (t) => {
         const e = await t.get<OutboxEntry>('outbox', seq);
         if (e) await t.put('outbox', { ...e, attempts: e.attempts + 1, lastError: error });
