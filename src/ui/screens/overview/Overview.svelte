@@ -18,7 +18,7 @@
   import SyncBadge from './SyncBadge.svelte';
   import UnitsSold from './UnitsSold.svelte';
   import { stockLine } from './stockLine.ts';
-  import { SECTION_KEY, owedDetail, parseSection, viewRange, type Section } from './logic.ts';
+  import { SECTION_KEY, owedDetail, parseSection, toggleSection, viewRange, type Section } from './logic.ts';
   import type { RangeKind } from './logic.ts';
 
   let {}: { params?: Record<string, string>; query?: Record<string, string> } = $props();
@@ -26,17 +26,18 @@
   const today = $derived(localDate());
 
   // One section at a time under the owed card, remembered per device (D-032).
-  function readSection(): Section {
+  function readSection(): Section | null {
     try {
       return parseSection(localStorage.getItem(SECTION_KEY));
     } catch {
-      return 'owes';
+      return null;
     }
   }
-  let section = $state<Section>(readSection());
-  function pickSection(v: Section) {
+  let section = $state<Section | null>(readSection());
+  function tapSection(v: Section) {
+    section = toggleSection(section, v);
     try {
-      localStorage.setItem(SECTION_KEY, v);
+      localStorage.setItem(SECTION_KEY, section ?? '');
     } catch {
       // Storage blocked: the choice still applies for this visit.
     }
@@ -103,7 +104,11 @@
 
   <OwedCard />
 
-  <Segmented label="Section" options={sectionOptions} bind:value={section} onchange={pickSection} />
+  <div class="sections" role="group" aria-label="Sections">
+    {#each sectionOptions as o (o.value)}
+      <button type="button" class="sec-btn" aria-pressed={section === o.value} onclick={() => tapSection(o.value)}>{o.label}</button>
+    {/each}
+  </div>
 
   {#if section === 'owes'}
   <section class="card">
@@ -207,6 +212,26 @@
     to {
       transform: rotate(360deg);
     }
+  }
+  .sections {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .sec-btn {
+    min-height: var(--tap);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--surface);
+    color: var(--ink);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .sec-btn[aria-pressed='true'] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--on-accent);
   }
   .page {
     padding-bottom: calc(var(--nav-h) + 96px);

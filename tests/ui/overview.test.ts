@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { barGeometry, niceMax, lineGeometry, VIEW } from '../../src/ui/charts/geometry.ts';
 import {
-  bucketLabel, debtSegments, owedDetail, parseSection, percents, seriesMetric, splitText, unitsText, variantText, viewRange,
+  bucketLabel, debtSegments, owedDetail, parseSection, toggleSection, percents, seriesMetric, splitText, unitsText, variantText, viewRange,
 } from '../../src/ui/screens/overview/logic.ts';
 import type { ClassSold, VariantSold } from '../../src/core/stats.ts';
 
@@ -105,10 +105,15 @@ describe('chart geometry', () => {
 });
 
 describe('Overview section buttons (D-032)', () => {
-  it('reads the remembered section, default Who owes', () => {
+  it('reads the remembered open section; none open by default', () => {
     expect(parseSection('top')).toBe('top');
-    expect(parseSection('stock')).toBe('stock');
-    expect(parseSection(null)).toBe('owes');
-    expect(parseSection('nope')).toBe('owes');
+    expect(parseSection('owes')).toBe('owes');
+    expect(parseSection(null)).toBeNull();
+    expect(parseSection('nope')).toBeNull();
+  });
+  it('a button opens its box, another switches, the same one closes it', () => {
+    expect(toggleSection(null, 'units')).toBe('units');
+    expect(toggleSection('units', 'stock')).toBe('stock');
+    expect(toggleSection('stock', 'stock')).toBeNull();
   });
 });

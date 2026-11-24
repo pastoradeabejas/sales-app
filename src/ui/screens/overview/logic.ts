@@ -64,5 +64,7 @@ export function bucketLabel(start: string, bucket: Bucket): string {
 /** Overview sections shown one at a time under the owed card (D-032). */
 export type Section = 'owes' | 'top' | 'units' | 'stock';
 export const SECTION_KEY = 'overviewSection';
-export const parseSection = (raw: string | null): Section =>
-  raw === 'top' || raw === 'units' || raw === 'stock' ? raw : 'owes';
+export const parseSection = (raw: string | null): Section | null =>
+  raw === 'owes' || raw === 'top' || raw === 'units' || raw === 'stock' ? raw : null;
+/** Tapping the open section's button closes it; any other button opens its section. */
+export const toggleSection = (open: Section | null, tapped: Section): Section | null => (open === tapped ? null : tapped);
