@@ -37,8 +37,8 @@
     collapsed = toggleCollapsed(collapsed, path);
     saveCollapsed(localStorage, 'stockCollapsed', collapsed);
   }
-  const recent = $derived(recentMovements(app.orders, app.stock, app.recipes, view.classesById, today));
-  const icons = { add: 'plus', remove: 'minus', transform: 'transform', sale: 'orders' } as const;
+  const recent = $derived(recentMovements(app.orders, app.stock, app.recipes, view.classesById, today, 10, app.purchases));
+  const icons = { add: 'plus', remove: 'minus', transform: 'transform', sale: 'orders', purchase: 'expenses' } as const;
 </script>
 
 <Header title="Stock" />
@@ -178,7 +178,8 @@
     background: var(--chip);
     color: var(--ink);
   }
-  .badge.add {
+  .badge.add,
+  .badge.purchase {
     background: var(--accent-soft);
     color: var(--accent-strong);
   }

@@ -4,7 +4,7 @@ import { formatUnitCost, parseMoney } from '../../../core/money.ts';
 import { fullName } from '../../../core/groups.ts';
 import { formatAmount } from '../../../core/quantity.ts';
 import { daysLeft, type Movement } from '../../../core/stock.ts';
-import type { ClassAmount, CostShare, Decimals, Id, LabourCost, Order, ProductClass, Scaled, StockEvent, TransformCosts } from '../../../core/types.ts';
+import type { ClassAmount, CostShare, Decimals, Id, LabourCost, Order, ProductClass, Purchase, Scaled, StockEvent, TransformCosts } from '../../../core/types.ts';
 
 /** Stock before and after an add or remove; an add on negative stock starts from 0 (§4.3). */
 export function movePreview(stock: Scaled, type: 'add' | 'remove', amount: Scaled | null) {
@@ -171,7 +171,7 @@ export function rateText(perDay: number, cls: ProductClass): string {
 
 export interface RecentItem {
   key: string;
-  kind: 'add' | 'remove' | 'transform' | 'sale';
+  kind: 'add' | 'remove' | 'transform' | 'sale' | 'purchase';
   title: string;
   sub: string;
   deltas: string[];
@@ -186,6 +186,7 @@ export function recentMovements(
   classesById: Map<Id, ProductClass>,
   today: string,
   limit = 10,
+  purchases: Purchase[] = [],
 ): RecentItem[] {
   const tracked = (id: Id) => classesById.get(id)?.trackStock === true;
   const named = (x: ClassAmount, sign: string) => `${nameOf(classesById, x.classId)} ${amountOf(classesById.get(x.classId), x.amount, sign)}`;
@@ -219,6 +220,14 @@ export function recentMovements(
       key: e.id, kind: e.type, date: e.date, createdAt: e.createdAt,
       title: add ? `Add · ${fullName(c)}` : `Remove · ${reasonLabel(e.reason) || 'Other'}`,
       sub: add ? `${day}${cost}` : `${day} · ${fullName(c)}`, deltas: [amountOf(c, e.amount, add ? '+' : '−')], href: `#/stock/${c.id}`,
+    });
+  }
+  for (const p of purchases) {
+    const lines = p.voided ? [] : p.lines.filter((l) => tracked(l.classId));
+    if (!lines.length) continue;
+    all.push({
+      key: p.id, kind: 'purchase', date: p.date, createdAt: p.createdAt, title: `Purchase · ${p.supplierName || 'No supplier'}`,
+      sub: cap(dayLabel(p.date, today)), deltas: lines.map((l) => named(l, '+')), href: `#/purchases/${p.id}`,
     });
   }
   all.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));

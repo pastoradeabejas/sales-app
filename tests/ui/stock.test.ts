@@ -227,6 +227,16 @@ describe('recentMovements', () => {
     expect(items[2]).toMatchObject({ title: 'Remove · Waste', sub: 'Yesterday · Yogurt', deltas: ['−16 pcs'], href: '#/stock/yog' });
     expect(items[3]).toMatchObject({ title: 'Add · Milk', sub: '20 Nov · €0.45 / kg', deltas: ['+2,000 kg'] });
   });
+  it('shows purchases with their stock lines; expense-only purchases are skipped (§16.3)', () => {
+    const map = new Map(byId);
+    map.set('fuel', cls('fuel', 'Fuel', 0, 'pcs', { trackStock: false, sellable: false }));
+    const pl = (classId: string, amount: number, lineTotal: number) => ({ lineId: 'l', classId, className: classId, unitName: 'kg', decimals: 3 as const, amount, lineTotal });
+    const p = (id: string, lines: ReturnType<typeof pl>[], supplierName = 'Granja') => ({
+      id, ...stamp(today, '13:00'), date: today, supplierId: null, supplierName, lines, total: 0, method: 'cash' as const, note: '', voided: false,
+    });
+    const got = recentMovements([], [], [], map, today, 10, [p('p1', [pl('milk', 100000, 4500), pl('fuel', 1, 4000)]), p('p2', [pl('fuel', 1, 4000)])]);
+    expect(got).toEqual([{ key: 'p1', kind: 'purchase', title: 'Purchase · Granja', sub: 'Today', deltas: ['Milk +100 kg'], href: '#/purchases/p1' }]);
+  });
   it('ignores sales of untracked classes', () => {
     const map = new Map(byId);
     map.set('x', cls('x', 'X', 0, 'pcs', { trackStock: false }));
