@@ -144,7 +144,7 @@
     {@const open = !collapsed.includes(g.path)}
     <div class="group">
       <div class="ghead">
-        <button type="button" class="gtoggle grow" aria-expanded={open} onclick={() => toggle(g.path)}>
+        <button type="button" class="gtoggle" aria-expanded={open} onclick={() => toggle(g.path)}>
           <Icon name={open ? 'up' : 'down'} size={18} />
           <span class="title ellipsis grow">{g.name}</span>
           <span class="muted">{g.count}</span>
@@ -316,6 +316,7 @@
     gap: 4px;
   }
   .gtoggle {
+    flex: 1;
     display: flex;
     align-items: center;
     gap: 8px;
