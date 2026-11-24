@@ -233,6 +233,13 @@ describe('demoRecords: catalogue and clients', () => {
     expect(transforms.some((t) => t.outputs.some((o) => o.classId === deluxe.id))).toBe(true);
   });
 
+  it('every variant on sale has been sold, and archived products have no stock left', () => {
+    const soldVariants = new Set(live.flatMap((o) => o.lines.map((l) => l.variantId)));
+    for (const p of products.filter((x) => x.sellable && !x.archived)) for (const v of p.variants.filter((x) => !x.archived)) expect(soldVariants.has(v.id), `${fullName(p)} ${v.label}`).toBe(true);
+    const snap = stockSnapshot(products, orders, stock, purchases);
+    for (const p of products.filter((x) => x.archived && x.trackStock)) expect(snap.get(p.id)!.stock, fullName(p)).toBe(0);
+  });
+
   it('has an archived product and an archived variant that still appear in old orders', () => {
     const archived = products.filter((p) => p.archived);
     expect(archived.length).toBeGreaterThanOrEqual(1);

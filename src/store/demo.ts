@@ -48,7 +48,7 @@ const SEASON = [0.8, 0.8, 0.9, 1, 1.1, 1, 0.85, 0.6, 1, 1.1, 1.25, 1.7];
 // slow = nothing paid in the last 120 days, never = never pays, credit = pays advances that cover the orders.
 const CLIENTS: [string, string, string[], number, number, number, string, Policy, boolean?][] = [
   ['Marta', '+34 600 111 222', ['family'], 450, 0, 9, 'f5 r1 pol comb mk y4 lav ch5', 'now', true],
-  ['Lucía', '+34 611 222 333', ['neighbour'], 448, 2, 12, 'f5 o5 fc chw comb', 'later', true],
+  ['Lucía', '+34 611 222 333', ['neighbour'], 448, 2, 12, 'f5 o5 fc chw chq comb', 'later', true],
   ['Javier', '', ['work'], 440, 5, 16, 'r5 r1 cho pl', 'instal'],
   ['Ana', '', [], 445, 0, 10, 'f1 mk y1 fc but wh', 'now'],
   ['Pedro', '+34 622 333 444', [], 450, 1, 11, 'r1 comb mbf stk', 'slow'],
@@ -75,7 +75,7 @@ const CLIENTS: [string, string, string[], number, number, number, string, Policy
   ['Maricarmen López', '', ['family'], 440, 2, 12, 'f5 r5 y4 fc', 'now'],
   ['Bar El Sol', '+34 655 000 111', ['restaurant'], 450, 300, 7, 'sau chw pl mk', 'now'],
   ['Tienda Ecológica Luna', '+34 655 000 222', ['shop'], 420, 1, 10, 'f5 f1 o5 o1 pol prop wh', 'later'],
-  ['Rocío', '', ['neighbour'], 350, 0, 13, 'y1 y4 mk fc wh', 'now'],
+  ['Rocío', '', ['neighbour'], 350, 0, 13, 'y1 y4 mk fc wh chq', 'now'],
   ['Manuel', '+34 644 555 666', ['work'], 330, 6, 17, 'stk mbf mb5 cho', 'instal'],
   ['Nuria', '', ['market'], 450, 2, 12, 'lav f5 h5 pol ch5', 'now', true],
   ['Jorge', '', [], 250, 0, 21, 'mk dz', 'now'],
@@ -162,7 +162,7 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
   const whey = product('Dairy/Cheese', 'Whey', 'L', 0, 10, true, [['wh', '1 L', 1, 150, null]], { notes: 'Made with the cured cheese.' });
   const freshCheese = product('Dairy/Cheese', 'Fresh cheese', 'pcs', 0, 6, true, [['fc', '250 g', 1, 350, null]]);
   const yogurt = product('Dairy/Yogurt', 'Natural yogurt', 'pot', 0, 10, true, [['y1', 'Single', 1, 90, null], ['y4', 'Pack of 4', 4, 320, 5]]);
-  const butter = product('Dairy/Butter', 'Butter', 'pcs', 0, 8, true, [['but', '250 g', 1, 480, null]]);
+  const butter = product('Dairy/Butter', 'Butter', 'pcs', 0, 8, true, [['but', '250 g', 1, 550, null]]);
   const kefir = product('Dairy/Kefir', 'Kefir', 'bottle', 0, 8, true, [['kef', '500 ml', 1, 280, null]]);
   const chorizo = product('Meat/Pork', 'Chorizo', 'pcs', 0, 5, true, [['cho', 'Piece', 1, 650, null]]);
   const porkLoin = product('Meat/Pork', 'Pork loin', 'kg', 3, 3000, true, [['pl', 'By weight', null, 1100, null]]);
@@ -222,10 +222,10 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
   maker(fill('h1', 'Heather', '1kg', heatherBulk, emptyJar1, h1, 1000, 3), 12);
   maker(recipe('box', 'Christmas box', [[f5, 1], [r1, 1], [giftBox, 1]], [[xmasBox, 1]], [['Ribbon', 60]], [[L2, 5]]), 6);
   maker(recipe('deluxe', 'Deluxe gift box', [[h5, 1], [largeCandle, 1], [giftBox, 1]], [[deluxeBox, 1]], [['Ribbon', 60]], [[L2, 6]]), 4);
-  const candleL = recipe('candle-l', 'Make large candle', [[beeswax, 250], [wick, 30], [labels, 1]], [[largeCandle, 1]], [['Electricity', 15]], [[L2, 20]]);
+  const candleL = recipe('candle-l', 'Make large candle', [[beeswax, 250], [wick, 30], [labels, 1]], [[largeCandle, 1]], [['Electricity', 15]], [[L2, 12]]);
   maker(candleL, 10);
   maker(recipe('candle-s', 'Make small candle', [[beeswax, 90], [wick, 20], [labels, 1]], [[smallCandle, 1]], [['Electricity', 8]], [[L2, 8]]), 20);
-  maker(recipe('butter', 'Make butter', [[rawMilk, 10], [butterPaper, 4]], [[butter, 4]], [['Salt', 30], ['Electricity', 30]], [[L2, 15]]), 3);
+  maker(recipe('butter', 'Make butter', [[rawMilk, 20], [butterPaper, 4]], [[butter, 4]], [['Salt', 30], ['Electricity', 30]], [[L2, 15]]), 3);
   maker(recipe('kefir', 'Make kefir', [[rawMilk, 1], [kefirBottle, 2]], [[kefir, 2]], [['Cultures', 25]], [[L1, 6]]), 10);
   maker(recipe('sausage', 'Make sausages', [[porkShoulder, 10000], [casing, 800]], [[sausages, 9000]], [['Spices', 1200], ['Electricity', 40]], [[L3, 60]]), 1);
   maker(recipe('eggs', 'Grade eggs', [[looseEggs, 12]], [[eggs, 12]], [], [[L1, 1]]), 10);
@@ -495,6 +495,7 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
     // Stock removes for every reason.
     if (day === 380) remove(f5, 2, 'waste', 'Two jars broke at the market');
     if (day === 300) remove(pollen, 1, 'gift');
+    if (day === UNTIL.lav) remove(lavender, bal.get(lavender.id) ?? 0, 'gift', 'Last jars, given to family when the product was dropped');
     if (day === 200) remove(bottle, 3, 'own use');
     if (day === 120) remove(smallCandle, 1, 'Market sample');
     if (day === 90) remove(lid, 5, 'count correction');
