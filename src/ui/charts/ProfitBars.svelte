@@ -1,6 +1,6 @@
 <script lang="ts">
   import { profitBarGeometry, VIEW } from './geometry.ts';
-  import type { TrendPoint } from '../screens/profit/logic.ts';
+  import { tickMoney, type TrendPoint } from '../screens/profit/logic.ts';
 
   // Sales and net profit per month in hand-built SVG; a loss goes below the zero line. Tapping a month selects it.
   let {
@@ -20,7 +20,7 @@
     <svg viewBox="0 0 {VIEW.w} {VIEW.h}" role="img" aria-label={summary}>
       {#each g.ticks as t (t.value)}
         <line x1={VIEW.left} x2={VIEW.w - VIEW.right} y1={t.y} y2={t.y} class="grid" class:zero={t.value === 0} />
-        <text x={VIEW.left - 4} y={t.y + 4} text-anchor="end" class="tick">{format(t.value)}</text>
+        <text x={VIEW.left - 4} y={t.y + 4} text-anchor="end" class="tick">{tickMoney(t.value)}</text>
       {/each}
       {#each g.bars as b, i (points[i].key)}
         <rect x={b.salesX} y={b.salesY} width={b.w} height={b.salesH} class="sales" class:dim={selected !== null && selected !== i} />

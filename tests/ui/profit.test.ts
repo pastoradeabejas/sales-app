@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { changeText, changeTone, marginText, monthLabel, pointsChange, profitRange, shareText, topRows, trendPoints } from '../../src/ui/screens/profit/logic.ts';
+import { changeText, changeTone, marginText, monthLabel, pointsChange, profitRange, shareText, tickMoney, topRows, trendPoints } from '../../src/ui/screens/profit/logic.ts';
 
 describe('profit formatting', () => {
   it('formats the change vs the previous period', () => {
@@ -71,5 +71,16 @@ describe('margin changes in percentage points', () => {
     expect(pointsChange(0.2, 0.25)).toEqual({ text: '▼ 5.0 pts', tone: 'down' });
     expect(pointsChange(0.3, 0.3)).toEqual({ text: '0 pts', tone: 'flat' });
     expect(pointsChange(null, 0.3)).toEqual({ text: '—', tone: 'flat' });
+  });
+});
+
+describe('tickMoney', () => {
+  it('short axis labels that fit: thousands as k, minus sign kept', () => {
+    expect(tickMoney(200000)).toBe('€2k');
+    expect(tickMoney(-100000)).toBe('−€1k');
+    expect(tickMoney(250000)).toBe('€2.5k');
+    expect(tickMoney(50000)).toBe('€500');
+    expect(tickMoney(250)).toBe('€2.5');
+    expect(tickMoney(0)).toBe('€0');
   });
 });

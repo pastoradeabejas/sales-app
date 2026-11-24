@@ -52,3 +52,10 @@ export const topRows = <T>(rows: T[], all: boolean): T[] => (all ? rows : rows.s
 export function trendPoints(trend: { month: string; sales: number; cogs: number; expenses: number; net: number }[]): TrendPoint[] {
   return trend.map((t) => ({ key: t.month, label: monthLabel(t.month), sales: t.sales, costs: t.cogs + t.expenses, net: t.net }));
 }
+
+/** Short axis label in euros that fits the chart's left margin: "€2k", "−€1.5k", "€500". */
+export function tickMoney(cents: number): string {
+  const e = Math.abs(cents) / 100;
+  const body = e >= 1000 ? `${Number((e / 1000).toFixed(1))}k` : String(Number(e.toFixed(2)));
+  return `${cents < 0 ? '−' : ''}€${body}`;
+}
