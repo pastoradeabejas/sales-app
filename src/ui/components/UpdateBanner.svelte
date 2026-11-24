@@ -2,8 +2,18 @@
   import { registerSW } from 'virtual:pwa-register';
 
   // Shown when a new service worker is waiting; reloads only on tap (spec §7).
+  // Checks for a new version at every load, when the app comes back to the front, and hourly.
   let waiting = $state(false);
-  const updateSW = registerSW({ onNeedRefresh: () => (waiting = true) });
+  const updateSW = registerSW({
+    onNeedRefresh: () => (waiting = true),
+    onRegisteredSW: (_url, r) => {
+      if (!r) return;
+      const check = () => void r.update().catch(() => undefined);
+      check();
+      setInterval(check, 60 * 60 * 1000);
+      document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && check());
+    },
+  });
 </script>
 
 {#if waiting}
