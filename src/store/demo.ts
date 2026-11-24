@@ -213,7 +213,7 @@ export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
     }));
   };
   const fill = (key: string, honey: string, size: string, bulkCls: ProductClass, empty: ProductClass, out: ProductClass, kg: number, time: number) =>
-    recipe(key, `Fill ${honey} ${size}`, [[empty, 1], [lid, 1], [bulkCls, kg]], out, [['Labels', 10], ['Time', time]], 1, [{ levelId: 'demo-level-1', minutes: time }]);
+    recipe(key, `Fill ${honey} ${size}`, [[empty, 1], [lid, 1], [bulkCls, kg]], out, [['Labels', 10]], 1, [{ levelId: 'demo-level-1', minutes: time / 20 }]);
   const fillF5 = fill('f5', 'Flower', '500g', flowerBulk, emptyJar5, f5, 500, 40);
   const fillF1 = fill('f1', 'Flower', '1kg', flowerBulk, emptyJar1, f1, 1000, 60);
   const fillR5 = fill('r5', 'Rosemary', '500g', rosemaryBulk, emptyJar5, r5, 500, 40);

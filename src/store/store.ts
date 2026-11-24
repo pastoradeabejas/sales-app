@@ -56,7 +56,7 @@ export interface StoreOptions {
 
 export type Store = ReturnType<typeof createStore>;
 
-const ALL: TableName[] = ['products', 'clients', 'orders', 'payments', 'stock', 'recipes', 'files', 'outbox', 'meta'];
+const ALL: TableName[] = ['products', 'clients', 'orders', 'payments', 'stock', 'recipes', 'suppliers', 'purchases', 'levels', 'files', 'outbox', 'meta'];
 const unique = <T>(xs: T[]) => [...new Set(xs)];
 
 // Transforms and purchases get a derived `classIds` field so the multi-entry index can find them; it never leaves the store.

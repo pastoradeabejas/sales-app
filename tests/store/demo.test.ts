@@ -153,7 +153,7 @@ describe('demoRecords', () => {
     expect(box[0].outputs).toEqual([{ classId: boxId, amount: 10 }]);
     expect(box[0].costs!.extras).toEqual([{ label: 'Time', amount: 1000 }]);
     const fill = transforms[0];
-    expect(fill.costs!.extras.map((e) => e.label)).toEqual(['Labels', 'Time']);
+    expect(fill.costs!.extras.map((e) => e.label)).toEqual(['Labels']);
   });
 });
 
@@ -162,10 +162,10 @@ describe('suppliers, work levels and purchases (§16.8)', () => {
     expect(suppliers.map((s) => s.name)).toEqual(['Envases Levante', 'Apícola Sur', 'Gasolinera']);
     expect(levels.map((l) => `${l.name}/${l.hourlyRate}`)).toEqual(['Level 1/1200', 'Level 2/1450', 'Level 3/1800']);
     const fills = recipes.filter((r) => r.name.startsWith('Fill'));
-    expect(fills.map((r) => r.labour![0].minutes)).toEqual([40, 60, 40, 60, 40, 60]);
+    expect(fills.map((r) => r.labour![0].minutes)).toEqual([2, 3, 2, 3, 2, 3]);
     const fillTransform = stock.find((e) => e.type === 'transform' && e.recipeId === fills[0].id);
     expect(fillTransform!.type === 'transform' && fillTransform!.costs!.labour).toEqual([
-      { levelId: 'demo-level-1', levelName: 'Level 1', minutes: 1600, hourlyRate: 1200, amount: 32000 },
+      { levelId: 'demo-level-1', levelName: 'Level 1', minutes: 80, hourlyRate: 1200, amount: 1600 },
     ]);
   });
 

@@ -211,8 +211,12 @@ describe('store: sync helpers', () => {
     await store.save('client', marta, path);
     await store.putFile({ path: 'p', blobSha: 's', recordType: 'client', recordId: 'x' });
     await store.setMeta('k', 1);
+    await store.save('supplier', { id: 's1', name: 'S' }, 'suppliers/s1.json');
+    await store.save('level', { id: 'l1', name: 'L' }, 'levels/l1.json');
+    await store.save('purchase', { id: 'p1', date: '2026-11-01', lines: [] }, 'purchases/2026/11/p1.json');
     await store.clearAll();
     expect(await store.all('clients')).toEqual([]);
+    for (const s of ['suppliers', 'levels', 'purchases'] as const) expect(await store.all(s)).toEqual([]);
     expect(await store.outboxCount()).toBe(0);
     expect((await store.files()).size).toBe(0);
     expect(await store.getMeta('k')).toBeUndefined();
