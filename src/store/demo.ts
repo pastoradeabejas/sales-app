@@ -1,14 +1,21 @@
-// Demo mode sample data (spec §2.1, §15): deterministic records relative to `today`, loaded without outbox.
-import { fullName } from '../core/groups.ts';
+// Demo mode sample data (spec §2.1, §15): 15 months of a farm shop, deterministic and relative to `today`, loaded without outbox.
+// Orders follow each client's rhythm and the seasons; stock is made or bought just in time, so it only runs out where a case says so.
 import { buildTransformCosts, labourCosts } from '../core/costs.ts';
+import { fullName } from '../core/groups.ts';
+import { perBaseUnit } from '../core/stock.ts';
 import {
-  SCHEMA_VERSION,
-  type Client, type Decimals, type IsoDate, type Order, type OrderLine, type Payment, type PaymentMethod,
-  type ProductClass, type Purchase, type PurchaseLine, type Recipe, type RecordType, type StockEvent, type Supplier, type Timestamp, type LabourRow, type Variant, type WorkLevel,
+  RECORD_SCHEMA,
+  type ClassAmount, type Client, type CostShare, type Decimals, type IsoDate, type LabourRow, type Order, type OrderLine, type Payment,
+  type PaymentMethod, type ProductClass, type Purchase, type PurchaseLine, type Recipe, type RecordType, type StockEvent, type Supplier,
+  type Timestamp, type Variant, type WorkLevel,
 } from '../core/types.ts';
 import type { Store } from './store.ts';
 
+/** Days of history before today. */
+export const DEMO_DAYS = 455;
+
 type Item = { type: RecordType; record: object };
+type Policy = 'now' | 'later' | 'instal' | 'slow' | 'never' | 'credit';
 
 const shift = (date: IsoDate, days: number) => {
   const d = new Date(`${date}T00:00:00Z`);
@@ -17,353 +24,475 @@ const shift = (date: IsoDate, days: number) => {
 };
 // Half-up rounding of a / d for non-negative integers, without floats.
 const roundDiv = (a: number, d: number) => Math.floor((2 * a + d) / (2 * d));
+const round4 = (x: number) => Math.round(Number((x * 1e4).toPrecision(12))) / 1e4;
+const pad = (n: number) => String(n).padStart(4, '0');
+/** A moment of a day: hour plus n × 20 s, so records of one day keep their order. */
+const at = (date: IsoDate, hour: number, n: number) => new Date(Date.parse(`${date}T${String(hour).padStart(2, '0')}:00:00Z`) + n * 20_000).toISOString();
 
-// Order specs: [days ago, client index, lines "variant:qty-or-scaled-amount", payment].
-// P paid on a linked payment, H half paid, U unpaid, L paid later by an unlinked payment, V voided.
-const ORDERS: [number, number, string, 'P' | 'H' | 'U' | 'L' | 'V'][] = [
-  [120, 0, 'f5:2', 'P'], [118, 2, 'r5:1 f1:1', 'P'], [116, 3, 'f5:3 pol:2', 'P'], [113, 1, 'comb:1373', 'L'],
-  [110, 4, 'r1:1', 'P'], [108, 5, 'f5:1 pol:2', 'P'], [105, 6, 'f1:2', 'P'], [102, 0, 'comb:860 r5:1', 'P'],
-  [99, 1, 'o5:2 o1:1', 'L'], [96, 2, 'r1:1', 'H'], [93, 3, 'f5:2', 'P'], [90, 4, 'comb:2140', 'P'],
-  [87, 5, 'r5:4', 'P'], [84, 6, 'f5:2', 'U'], [81, 0, 'f1:1', 'P'], [78, 1, 'f5:1 r5:2', 'L'],
-  [75, 2, 'comb:1015', 'P'], [72, 3, 'o1:1 f5:1', 'P'], [69, 4, 'r1:1', 'V'], [66, 5, 'o5:3', 'P'],
-  [63, 0, 'f5:3', 'P'], [59, 6, 'pol:3', 'P'], [56, 1, 'pol:6 comb:745', 'L'], [53, 2, 'o5:4', 'P'],
-  [50, 3, 'comb:1290', 'H'], [47, 4, 'box:2', 'P'], [44, 5, 'f5:2 pol:4', 'P'], [41, 0, 'r5:3', 'P'],
-  [37, 6, 'box:1', 'H'], [34, 1, 'f5:4', 'L'], [30, 2, 'pol:8 r5:6', 'U'], [27, 3, 'f1:1', 'P'],
-  [23, 4, 'comb:1580 o1:1', 'U'], [20, 5, 'box:3', 'P'], [16, 0, 'r1:2 f5:1', 'H'], [13, 1, 'pol:5', 'P'],
-  [9, 6, 'comb:930', 'U'], [6, 3, 'box:2 pol:2', 'U'], [3, 0, 'f5:2 r5:2', 'U'], [1, 4, 'r1:1', 'P'],
-  [0, 2, 'comb:1137', 'U'],
-  // Dairy and meat (D-017).
-  [115, 0, 'mk:4 y4:2', 'P'], [107, 2, 'chw:1250 fc:2', 'P'], [101, 4, 'cho:2 pl:1500', 'P'], [94, 6, 'mk:6 chq:1', 'H'],
-  [86, 3, 'mbf:1000 y1:6', 'P'], [79, 1, 'fc:3 mk:3', 'L'], [71, 5, 'chw:800 cho:1', 'P'], [62, 0, 'y4:3 mk:4', 'P'],
-  [52, 2, 'mb5:2 pl:1200', 'U'], [38, 4, 'stk:900 mk:2', 'P'], [31, 6, 'chq:2 fc:2', 'P'], [24, 3, 'stk:1100 mbf:600', 'H'],
-  [17, 0, 'y4:2 cho:3', 'P'], [11, 0, 'mk:6 fc:2', 'U'], [5, 2, 'chw:640 stk:500', 'P'], [2, 5, 'mb5:1 y1:4', 'P'],
-  [0, 6, 'mk:3 cho:1', 'U'],
-];
+/** Seeded generator (mulberry32): the same numbers on every device. */
+function random(seed: number) {
+  return () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
-// The first seven clients are ordered by hand above; the others are [name, phone, tags, first day, step, last day, pool, payment policy].
-// Policy: g good payer (latest orders still unpaid), m some half paid or unpaid, r last 30 days unpaid, a never paid.
-const CLIENTS: [string, string, string[]][] = [
-  ['Marta', '+34 600 111 222', ['family']], ['Lucía', '+34 611 222 333', ['neighbour']], ['Javier', '', ['work']],
-  ['Ana', '', []], ['Pedro', '+34 622 333 444', []], ['Carmen', '', ['family']], ['Luis', '', []],
-];
-const REGULARS: [string, string, string[], number, number, number, string, 'g' | 'm' | 'r' | 'a'][] = [
-  ['Rosa', '+34 633 100 101', ['market'], 119, 12, 4, 'dz hd but kef cl h5', 'g'],
-  ['Antonio', '+34 633 100 102', ['restaurant'], 116, 9, 2, 'sau lam but dz kef sa4', 'm'],
-  ['Elena', '+34 633 100 103', ['shop'], 118, 14, 5, 'h5 cs cl prop but sa4', 'g'],
-  ['Miguel', '', ['family'], 112, 20, 10, 'h1 cl dz lam', 'g'],
-  ['Carlos', '+34 633 100 105', ['restaurant'], 117, 10, 3, 'sau lam dz but kef', 'g'],
-  ['Isabel', '', ['market'], 114, 15, 6, 'cs cl hd kef prop', 'g'],
-  ['Francisco', '+34 633 100 107', ['shop'], 110, 13, 4, 'h5 h1 sa4 but kef cs', 'r'],
-  ['Pilar', '', ['neighbour'], 105, 21, 8, 'dz kef but', 'g'],
-  ['Joaquín', '+34 633 100 109', ['restaurant'], 112, 20, 12, 'sau lam dz but', 'a'],
-  ['Dolores', '', ['family'], 100, 16, 4, 'h5 cl prop hd lam', 'm'],
-  ['Raúl', '', [], 118, 25, 75, 'sa4 dz', 'a'],
-  ['Teresa', '+34 633 100 112', ['market'], 108, 11, 3, 'dz hd cs cl kef but', 'g'],
-  ['Sergio', '+34 633 100 113', ['shop'], 115, 17, 5, 'h5 h1 cl prop sa4', 'g'],
-  ['Inés', '', ['neighbour'], 120, 18, 70, 'hd kef but', 'g'],
-  ['Fernando', '+34 633 100 115', ['restaurant'], 113, 12, 1, 'sau lam dz sa4 but', 'g'],
-  ['Beatriz', '', ['work'], 115, 20, 80, 'cs h5', 'm'],
-  ['Alberto', '', [], 110, 22, 66, 'lam dz', 'g'],
-  ['Cristina', '+34 633 100 118', ['market'], 104, 13, 0, 'cl cs h5 hd kef prop box2', 'g'],
-];
-CLIENTS.push(...REGULARS.map(([name, phone, tags]): [string, string, string[]] => [name, phone, tags]));
-// Days ago from which each product exists (made or added); a generated order never goes further back.
-const FROM: Record<string, number> = {
-  h5: 98, h1: 98, cl: 100, cs: 100, prop: 124, but: 106, kef: 104, sau: 102, sa4: 102, lam: 124, dz: 110, hd: 110, box2: 31,
-};
-REGULARS.forEach(([, , , first, step, last, pool, policy], k) => {
-  const keys = pool.split(' ');
-  for (let j = 0, days = first; days >= last; j++, days -= step) {
-    const lines = [0, 1].slice(0, j % 3 === 0 ? 2 : 1).map((i) => keys[(j + i * 2 + k) % keys.length]).filter((key, i, a) => days <= FROM[key] && a.indexOf(key) === i);
-    if (!lines.length) continue;
-    const spec = lines.map((key) => `${key}:${/^(sau|lam)$/.test(key) ? 500 + ((j * 7 + k * 3) % 8) * 150 : 1 + ((j + k) % 3)}`).join(' ');
-    const status = policy === 'a' ? 'U' : policy === 'r' ? (days <= 30 ? 'U' : 'P')
-      : policy === 'm' ? (j % 3 === 0 ? 'H' : j % 5 === 1 ? 'U' : 'P') : days <= 3 ? 'U' : 'P';
-    ORDERS.push([days, 7 + k, spec, status]);
-  }
-});
+// Sales per month relative to the average: summer dip, Christmas peak.
+const SEASON = [0.8, 0.8, 0.9, 1, 1.1, 1, 0.85, 0.6, 1, 1.1, 1.25, 1.7];
 
-/** Sample records for Demo mode; `today` is the local date, `now` stamps every record. */
+// [name, phone, tags, first day ago, last day ago, days between orders, variant keys, payment policy, buys gifts].
+// Policy: now = paid at once, later = monthly payment of what is owed, instal = half now and the rest in instalments,
+// slow = nothing paid in the last 120 days, never = never pays, credit = pays advances that cover the orders.
+const CLIENTS: [string, string, string[], number, number, number, string, Policy, boolean?][] = [
+  ['Marta', '+34 600 111 222', ['family'], 450, 0, 9, 'f5 r1 pol comb mk y4 lav', 'now', true],
+  ['Lucía', '+34 611 222 333', ['neighbour'], 448, 2, 12, 'f5 o5 fc chw comb', 'later', true],
+  ['Javier', '', ['work'], 440, 5, 16, 'r5 r1 cho pl', 'instal'],
+  ['Ana', '', [], 445, 0, 10, 'f1 mk y1 fc but', 'now'],
+  ['Pedro', '+34 622 333 444', [], 450, 1, 11, 'r1 comb mbf stk', 'slow'],
+  ['Carmen', '', ['family'], 430, 0, 14, 'pol f5 kef but', 'credit', true],
+  ['Luis', '', [], 420, 3, 18, 'f5 h5 lav o1', 'later', true],
+  ['Rosa', '+34 633 100 101', ['market'], 455, 0, 7, 'dz hd but kef cl h5 dzt', 'now'],
+  ['Antonio', '+34 633 100 102', ['restaurant'], 450, 1, 6, 'sau lam but dz kef sa4', 'later'],
+  ['Elena', '+34 633 100 103', ['shop'], 452, 2, 9, 'h5 cs cl prop but sa4', 'instal', true],
+  ['Miguel', '', ['family'], 400, 10, 20, 'h1 cl dz lam', 'now'],
+  ['Carlos', '+34 633 100 105', ['restaurant'], 455, 0, 6, 'sau lam dz but kef stk dzt', 'now'],
+  ['Isabel', '', ['market'], 440, 4, 10, 'cs cl hd kef prop', 'now'],
+  ['Francisco', '+34 633 100 107', ['shop'], 430, 2, 9, 'h5 h1 sa4 but kef cs', 'slow'],
+  ['Pilar', '', ['neighbour'], 380, 8, 15, 'dz kef but', 'now'],
+  ['Joaquín', '+34 633 100 109', ['restaurant'], 200, 12, 14, 'sau lam dz but', 'never'],
+  ['Dolores', '', ['family'], 410, 4, 13, 'h5 cl prop hd lam', 'instal', true],
+  ['Raúl', '', [], 450, 75, 20, 'sa4 dz', 'later'],
+  ['Teresa', '+34 633 100 112', ['market'], 445, 3, 8, 'dz hd cs cl kef but dzt', 'now'],
+  ['Sergio', '+34 633 100 113', ['shop'], 435, 5, 11, 'h5 h1 cl prop sa4', 'now', true],
+  ['Inés', '', ['neighbour'], 455, 70, 15, 'hd kef but', 'now'],
+  ['Fernando', '+34 633 100 115', ['restaurant'], 440, 1, 7, 'sau lam dz sa4 but chw', 'later'],
+  ['Beatriz', '', ['work'], 400, 80, 16, 'cs h5', 'instal'],
+  ['Alberto', '', [], 390, 66, 18, 'lam dz', 'now'],
+  ['Cristina', '+34 633 100 118', ['market'], 420, 0, 9, 'cl cs h5 hd kef prop', 'now', true],
+  ['Maricarmen López', '', ['family'], 440, 2, 12, 'f5 r5 y4 fc', 'now'],
+  ['Bar El Sol', '+34 655 000 111', ['restaurant'], 450, 300, 7, 'sau chw pl mk', 'now'],
+  ['Tienda Ecológica Luna', '+34 655 000 222', ['shop'], 420, 1, 10, 'f5 f1 o5 o1 pol prop wh', 'later'],
+  ['Rocío', '', ['neighbour'], 350, 0, 13, 'y1 y4 mk fc wh', 'now'],
+  ['Manuel', '+34 644 555 666', ['work'], 330, 6, 17, 'stk mbf mb5 cho', 'instal'],
+  ['Nuria', '', ['market'], 450, 2, 12, 'lav f5 h5 pol', 'now', true],
+  ['Jorge', '', [], 250, 0, 21, 'mk dz', 'now'],
+  ['Paula', '+34 699 888 777', ['family'], 180, 0, 10, 'y4 fc but kef', 'credit'],
+  ['Hotel Mirador', '+34 655 000 333', ['restaurant'], 380, 0, 8, 'lam stk chw sau mk but', 'instal'],
+  ['Eva', '', ['work'], 120, 0, 15, 'h5 cl o5', 'now', true],
+];
+const RENAMED = { client: 'Maricarmen López', oldName: 'Mari Carmen', since: 60 };
+const ARCHIVED_CLIENT = 'Bar El Sol';
+// Variants on sale only part of the time (days ago): the archived lavender jar and egg tray, the Christmas boxes.
+const UNTIL: Record<string, number> = { lav: 300, dzt: 250 };
+const RESTAURANT_DISCOUNT = 0.9;
+const PRICE_RISE_DAYS = 200;
+const OLD_PRICE = 0.92;
+
+/** Sample records for Demo mode; `today` is the local date, `now` stamps the catalogue. */
 export function demoRecords(today: IsoDate, now: Timestamp): Item[] {
-  const stamp = { createdAt: now, updatedAt: now, updatedBy: 'Demo' };
-  const base = { ...stamp, schema: SCHEMA_VERSION };
+  const r = random(20261124);
   const ago = (n: number) => shift(today, -n);
+  const start = ago(DEMO_DAYS);
+  const made = { schema: RECORD_SCHEMA, createdAt: at(start, 5, 0), updatedAt: now, updatedBy: 'Demo' };
+  const stamp = (createdAt: Timestamp) => ({ schema: RECORD_SCHEMA, createdAt, updatedAt: createdAt, updatedBy: 'Demo' });
 
+  // ---------- catalogue ----------
   const variants = new Map<string, { cls: ProductClass; v: Variant }>();
+  const products: ProductClass[] = [];
   const product = (
-    n: number, group: string, name: string, unit: string, decimals: Decimals, low: number | null, sellable: boolean,
-    vs: [key: string, label: string, baseAmount: number | null, price: number, cost: number | null][],
+    group: string, name: string, unit: string, decimals: Decimals, low: number | null, sellable: boolean,
+    vs: [key: string, label: string, baseAmount: number | null, price: number, cost: number | null, archived?: boolean][] = [],
+    extra: Partial<ProductClass> = {},
   ): ProductClass => {
     const cls: ProductClass = {
-      ...base, id: `demo-class-${String(n).padStart(2, '0')}`, name, group, unit: { name: unit, decimals }, lowStockThreshold: low, trackStock: true,
-      sellable, customFields: [], customValues: {}, notes: '', archived: false, variants: [],
+      ...made, id: `demo-class-${String(products.length + 1).padStart(2, '0')}`, name, group, unit: { name: unit, decimals },
+      lowStockThreshold: low, trackStock: true, sellable, customFields: [], customValues: {}, notes: '', archived: false, variants: [], ...extra,
     };
-    cls.variants = vs.map(([key, label, baseAmount, price, cost], i) => {
+    cls.variants = vs.map(([key, label, baseAmount, price, cost, archived], i) => {
       const v: Variant = {
-        ...stamp, id: `demo-var-${key}`, label, kind: baseAmount === null ? 'variable' : 'fixed',
-        baseAmount, price, cost, sortOrder: i + 1, archived: false,
+        createdAt: made.createdAt, updatedAt: now, updatedBy: 'Demo', id: `demo-var-${key}`, label, kind: baseAmount === null ? 'variable' : 'fixed',
+        baseAmount, price, cost, sortOrder: i + 1, archived: archived ?? false,
       };
       variants.set(key, { cls, v });
       return v;
     });
+    products.push(cls);
     return cls;
   };
-  const bulk = (n: number, honey: string) => product(n, `Honey/${honey}`, 'Bulk', 'kg', 3, 5000, false, []);
-  const jar = (n: number, honey: string, name: string, key: string, label: string, price: number, cost: number, low: number) =>
-    product(n, `Honey/${honey}`, name, 'jar', 0, low, true, [[key, label, 1, price, cost]]);
-  const flowerBulk = bulk(1, 'Flower');
-  const f5 = jar(2, 'Flower', '500g Jar', 'f5', '500 g', 850, 390, 10);
-  const f1 = jar(3, 'Flower', '1kg Jar', 'f1', '1 kg', 1500, 770, 10);
-  const rosemaryBulk = bulk(4, 'Rosemary');
-  const r5 = jar(5, 'Rosemary', '500g Jar', 'r5', '500 g', 950, 465, 10);
-  const r1 = jar(6, 'Rosemary', '1kg Jar', 'r1', '1 kg', 1700, 880, 10);
-  const oakBulk = bulk(7, 'Oak');
-  const o5 = jar(8, 'Oak', '500g Jar', 'o5', '500 g', 900, 515, 10);
-  const o1 = jar(9, 'Oak', '1kg Jar', 'o1', '1 kg', 1600, 980, 10);
-  const packaging = (n: number, name: string, low: number) => product(n, 'Packaging', name, 'pcs', 0, low, false, []);
-  const emptyJar5 = packaging(10, 'Empty jar 500g', 30);
-  const emptyJar1 = packaging(11, 'Empty jar 1kg', 20);
-  const lid = packaging(12, 'Lid', 50);
-  const giftBox = packaging(13, 'Gift box', 5);
-  const xmasBox = product(14, 'Gifts', 'Christmas box', 'pcs', 0, 3, true, [
-    ['box', 'Box', 1, 2500, 1520], ['box2', 'Deluxe (honey + candle)', 1, 3600, null],
-  ]);
-  const comb = product(15, 'Honeycomb', 'Honeycomb', 'kg', 3, 2000, true, [['comb', 'By weight', null, 3000, 2000]]);
-  const pollen = product(16, 'Pollen', '250g Jar', 'jar', 0, 8, true, [['pol', '250 g', 1, 700, 250]]);
-  const rawMilk = product(17, 'Dairy/Milk', 'Raw milk', 'L', 0, 50, false, []);
-  const bottle = product(18, 'Dairy/Milk', '1L Bottle', 'bottle', 0, 10, true, [['mk', '1 L', 1, 180, 90]]);
-  const curedCheese = product(19, 'Dairy/Cheese', 'Cured cheese', 'kg', 3, 2000, true, [
-    ['chw', 'By weight', null, 1800, 900], ['chq', 'Quarter 750 g', 750, 1350, 700],
-  ]);
-  const freshCheese = product(20, 'Dairy/Cheese', 'Fresh cheese', 'pcs', 0, 6, true, [['fc', '250 g', 1, 350, 160]]);
-  const yogurt = product(21, 'Dairy/Yogurt', 'Natural yogurt', 'pot', 0, 10, true, [['y1', 'Single', 1, 90, 40], ['y4', 'Pack of 4', 4, 320, 160]]);
-  const chorizo = product(22, 'Meat/Pork', 'Chorizo', 'pcs', 0, 5, true, [['cho', 'Piece', 1, 650, 380]]);
-  const porkLoin = product(23, 'Meat/Pork', 'Pork loin', 'kg', 3, 3000, true, [['pl', 'By weight', null, 1100, 700]]);
-  const minced = product(24, 'Meat/Beef', 'Minced beef', 'kg', 3, 2000, true, [
-    ['mbf', 'By weight', null, 1300, 850], ['mb5', '500 g pack', 500, 700, 430],
-  ]);
-  const steak = product(25, 'Meat/Beef', 'Steak', 'kg', 3, 1000, true, [['stk', 'By weight', null, 2600, 1700]]);
-  const heatherBulk = bulk(26, 'Heather');
-  const h5 = jar(27, 'Heather', '500g Jar', 'h5', '500 g', 1250, 555, 10);
-  const h1 = jar(28, 'Heather', '1kg Jar', 'h1', '1 kg', 2200, 1070, 8);
-  const candle = product(29, 'Candles', 'Beeswax candle', 'pcs', 0, 10, true, [['cs', 'Small', 1, 650, null], ['cl', 'Large', 1, 1450, 820]]);
-  const propolis = product(30, 'Wellness', 'Propolis tincture', 'pcs', 0, 5, true, [['prop', '30 ml', 1, 1200, 600]]);
-  const butter = product(31, 'Dairy/Butter', 'Butter', 'pcs', 0, 8, true, [['but', '250 g', 1, 480, 260]]);
-  const kefir = product(32, 'Dairy/Kefir', 'Kefir', 'bottle', 0, 8, true, [['kef', '500 ml', 1, 280, 120]]);
-  const sausages = product(33, 'Meat/Pork', 'Sausages', 'kg', 3, 2000, true, [['sau', 'By weight', null, 1450, 900], ['sa4', '400 g pack', 400, 620, 380]]);
-  const lamb = product(34, 'Meat/Lamb', 'Lamb chops', 'kg', 3, 1500, true, [['lam', 'By weight', null, 2400, 1600]]);
-  const eggs = product(35, 'Eggs', 'Eggs', 'egg', 0, 24, true, [['dz', 'Dozen', 12, 360, 220], ['hd', 'Half dozen', 6, 190, null]]);
-  const rawMaterial = (n: number, name: string, unit: string, decimals: Decimals, low: number) => product(n, 'Raw materials', name, unit, decimals, low, false, []);
-  const labels = packaging(36, 'Labels', 100);
-  const wick = rawMaterial(37, 'Candle wick', 'm', 2, 500);
-  const beeswax = rawMaterial(38, 'Beeswax', 'kg', 3, 1000);
-  const butterPaper = packaging(39, 'Butter paper', 30);
-  const kefirBottle = packaging(40, 'Kefir bottle', 20);
-  const casing = rawMaterial(41, 'Sausage casing', 'm', 1, 100);
-  const eggBox = packaging(42, 'Egg box', 20);
-  const porkShoulder = rawMaterial(43, 'Pork shoulder', 'kg', 3, 3000);
-  const looseEggs = rawMaterial(44, 'Loose eggs', 'egg', 0, 60);
-  const expense = (n: number, name: string): ProductClass => ({
-    ...product(n, 'Expenses', name, 'pcs', 0, null, false, []), trackStock: false,
+  const harvest = (season: string): Partial<ProductClass> => ({
+    customFields: [{ key: 'harvest', label: 'Harvest', type: 'text' }], customValues: { harvest: season },
   });
+  const bulk = (honey: string) => product(`Honey/${honey}`, 'Bulk', 'kg', 3, 5000, false);
+  const jar = (honey: string, name: string, key: string, label: string, price: number, cost: number, low: number, season: string) =>
+    product(`Honey/${honey}`, name, 'jar', 0, low, true, [[key, label, 1, price, cost]], harvest(season));
+  const flowerBulk = bulk('Flower');
+  const f5 = jar('Flower', '500g Jar', 'f5', '500 g', 850, 390, 10, 'Spring');
+  const f1 = jar('Flower', '1kg Jar', 'f1', '1 kg', 1500, 770, 10, 'Spring');
+  const rosemaryBulk = bulk('Rosemary');
+  const r5 = jar('Rosemary', '500g Jar', 'r5', '500 g', 950, 465, 10, 'Spring');
+  const r1 = jar('Rosemary', '1kg Jar', 'r1', '1 kg', 1700, 880, 10, 'Spring');
+  const oakBulk = bulk('Oak');
+  const o5 = jar('Oak', '500g Jar', 'o5', '500 g', 900, 515, 10, 'Autumn');
+  const o1 = jar('Oak', '1kg Jar', 'o1', '1 kg', 1600, 980, 10, 'Autumn');
+  const heatherBulk = bulk('Heather');
+  const h5 = jar('Heather', '500g Jar', 'h5', '500 g', 1250, 555, 10, 'Autumn');
+  const h1 = jar('Heather', '1kg Jar', 'h1', '1 kg', 2200, 1070, 8, 'Autumn');
+  const lavender = product('Honey/Lavender', '500g Jar', 'jar', 0, 10, true, [['lav', '500 g', 1, 1100, 520]], { ...harvest('Summer'), archived: true, notes: 'No longer made.' });
+  const packaging = (name: string, low: number) => product('Packaging', name, 'pcs', 0, low, false);
+  const emptyJar5 = packaging('Empty jar 500g', 30);
+  const emptyJar1 = packaging('Empty jar 1kg', 20);
+  const lid = packaging('Lid', 50);
+  const giftBox = packaging('Gift box', 5);
+  const labels = packaging('Labels', 100);
+  const butterPaper = packaging('Butter paper', 30);
+  const kefirBottle = packaging('Kefir bottle', 20);
+  const eggBox = packaging('Egg box', 20);
+  const xmasBox = product('Gifts', 'Christmas box', 'pcs', 0, 3, true, [['box', 'Box', 1, 2500, 1520], ['box2', 'Deluxe (honey + candle)', 1, 3600, null]]);
+  const comb = product('Honeycomb', 'Honeycomb', 'kg', 3, 2000, true, [['comb', 'By weight', null, 3000, 2000]]);
+  const pollen = product('Pollen', '250g Jar', 'jar', 0, 8, true, [['pol', '250 g', 1, 700, 250]]);
+  const rawMilk = product('Dairy/Milk', 'Raw milk', 'L', 0, 50, false);
+  const bottle = product('Dairy/Milk', '1L Bottle', 'bottle', 0, 10, true, [['mk', '1 L', 1, 180, 90]]);
+  const curedCheese = product('Dairy/Cheese', 'Cured cheese', 'kg', 3, 2000, true, [['chw', 'By weight', null, 1800, 900], ['chq', 'Quarter 750 g', 750, 1350, 700]], {
+    customFields: [{ key: 'cure', label: 'Cure (months)', type: 'number' }], customValues: { cure: 6 },
+  });
+  const whey = product('Dairy/Cheese', 'Whey', 'L', 0, 10, true, [['wh', '1 L', 1, 150, 60]], { notes: 'Made with the cured cheese.' });
+  const freshCheese = product('Dairy/Cheese', 'Fresh cheese', 'pcs', 0, 6, true, [['fc', '250 g', 1, 350, 160]]);
+  const yogurt = product('Dairy/Yogurt', 'Natural yogurt', 'pot', 0, 10, true, [['y1', 'Single', 1, 90, 40], ['y4', 'Pack of 4', 4, 320, 160]]);
+  const butter = product('Dairy/Butter', 'Butter', 'pcs', 0, 8, true, [['but', '250 g', 1, 480, 260]]);
+  const kefir = product('Dairy/Kefir', 'Kefir', 'bottle', 0, 8, true, [['kef', '500 ml', 1, 280, 120]]);
+  const chorizo = product('Meat/Pork', 'Chorizo', 'pcs', 0, 5, true, [['cho', 'Piece', 1, 650, 380]]);
+  const porkLoin = product('Meat/Pork', 'Pork loin', 'kg', 3, 3000, true, [['pl', 'By weight', null, 1100, 700]]);
+  const sausages = product('Meat/Pork', 'Sausages', 'kg', 3, 2000, true, [['sau', 'By weight', null, 1450, 900], ['sa4', '400 g pack', 400, 620, 380]]);
+  const minced = product('Meat/Beef', 'Minced beef', 'kg', 3, 2000, true, [['mbf', 'By weight', null, 1300, 850], ['mb5', '500 g pack', 500, 700, 430]]);
+  const steak = product('Meat/Beef', 'Steak', 'kg', 3, 1000, true, [['stk', 'By weight', null, 2600, 1700]]);
+  const lamb = product('Meat/Lamb', 'Lamb chops', 'kg', 3, 1500, true, [['lam', 'By weight', null, 2400, 1600]]);
+  const candle = product('Candles', 'Beeswax candle', 'pcs', 0, 10, true, [['cs', 'Small', 1, 650, null], ['cl', 'Large', 1, 1450, 820]]);
+  const propolis = product('Wellness', 'Propolis tincture', 'pcs', 0, 5, true, [['prop', '30 ml', 1, 1200, 600]]);
+  const eggs = product('Eggs', 'Eggs', 'egg', 0, 24, true, [['dz', 'Dozen', 12, 360, 220], ['hd', 'Half dozen', 6, 190, null], ['dzt', 'Tray of 30', 30, 850, 520, true]]);
+  const raw = (name: string, unit: string, decimals: Decimals, low: number) => product('Raw materials', name, unit, decimals, low, false);
+  const wick = raw('Candle wick', 'm', 2, 500);
+  const beeswax = raw('Beeswax', 'kg', 3, 1000);
+  const casing = raw('Sausage casing', 'm', 1, 100);
+  const porkShoulder = raw('Pork shoulder', 'kg', 3, 3000);
+  const looseEggs = raw('Loose eggs', 'egg', 0, 60);
+  const expense = (name: string) => product('Expenses', name, 'pcs', 0, null, false, [], { trackStock: false });
   const [fuel, marketFee, hiveTreatment, electricity, vet, transport, stallRent, phone, insurance, equipment, feed] =
-    ['Fuel', 'Market fee', 'Hive treatment', 'Electricity', 'Vet', 'Packaging transport', 'Market stall rent', 'Phone', 'Insurance', 'Equipment', 'Feed']
-      .map((name, i) => expense(45 + i, name));
-  const products = [
-    flowerBulk, f5, f1, rosemaryBulk, r5, r1, oakBulk, o5, o1, emptyJar5, emptyJar1, lid, giftBox, xmasBox, comb, pollen,
-    rawMilk, bottle, curedCheese, freshCheese, yogurt, chorizo, porkLoin, minced, steak,
-    heatherBulk, h5, h1, candle, propolis, butter, kefir, sausages, lamb, eggs, labels, wick, beeswax, butterPaper, kefirBottle, casing, eggBox,
-    porkShoulder, looseEggs, fuel, marketFee, hiveTreatment, electricity, vet, transport, stallRent, phone, insurance, equipment, feed,
-  ];
+    ['Fuel', 'Market fee', 'Hive treatment', 'Electricity', 'Vet', 'Packaging transport', 'Market stall rent', 'Phone', 'Insurance', 'Equipment', 'Feed'].map(expense);
+  const byId = new Map(products.map((p) => [p.id, p]));
 
-  const supplier = (n: number, name: string): Supplier => ({ ...base, id: `demo-supplier-${n}`, name, phone: '', notes: '', archived: false });
-  const suppliers = ['Envases Levante', 'Apícola Sur', 'Gasolinera', 'Piensos del Valle', 'Clínica Veterinaria Sol', 'Iberluz', 'Seguros Mediterráneo', 'Imprenta Gráfica']
-    .map((name, i) => supplier(i + 1, name));
-  const [envases, apicola, gasolinera, piensos, clinica, iberluz, seguros, imprenta] = suppliers;
-  const levels: WorkLevel[] = [['Level 1', 1200], ['Level 2', 1450], ['Level 3', 1800]].map(([name, hourlyRate], i) => ({
-    ...base, id: `demo-level-${i + 1}`, name: name as string, hourlyRate: hourlyRate as number, archived: false,
+  const suppliers: Supplier[] = ['Envases Levante', 'Apícola Sur', 'Gasolinera', 'Piensos del Valle', 'Clínica Veterinaria Sol', 'Iberluz',
+    'Seguros Mediterráneo', 'Imprenta Gráfica', 'Granja La Vega', 'Carnes Ruiz']
+    .map((name, i) => ({ ...made, id: `demo-supplier-${i + 1}`, name, phone: '', notes: '', archived: false }));
+  const [envases, apicola, gasolinera, piensos, clinica, iberluz, seguros, imprenta, granja, carnes] = suppliers;
+  const levels: WorkLevel[] = ([['Level 1', 1200], ['Level 2', 1450], ['Level 3', 1800]] as const).map(([name, hourlyRate], i) => ({
+    ...made, id: `demo-level-${i + 1}`, name, hourlyRate, archived: false,
   }));
   const levelsById = new Map(levels.map((l) => [l.id, l]));
+  const [L1, L2, L3] = levels.map((l) => l.id);
 
-  const clients: Client[] = CLIENTS.map(([name, phone, tags]) => ({
-    ...base, id: `demo-client-${name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()}`, name, phone, notes: '', tags, archived: false,
-  }));
+  // ---------- recipes ----------
+  const recipes: Recipe[] = [];
+  const recipe = (key: string, name: string, inputs: [ProductClass, number][], outputs: [ProductClass, number][], extras: [string, number][], labour: [string, number][], shares?: number[]) => {
+    const rec: Recipe = {
+      ...made, id: `demo-recipe-${key}`, name, inputs: inputs.map(([c, amount]) => ({ classId: c.id, amount })),
+      outputs: outputs.map(([c, amount]) => ({ classId: c.id, amount })), extras: extras.map(([label, amount]) => ({ label, amount })),
+      shares: outputs.map(([c], i) => ({ classId: c.id, share: shares?.[i] ?? 1 / outputs.length })),
+      labour: labour.map(([levelId, minutes]) => ({ levelId, minutes })), archived: false,
+    };
+    recipes.push(rec);
+    return rec;
+  };
+  const fill = (key: string, honey: string, size: string, bulkCls: ProductClass, empty: ProductClass, out: ProductClass, grams: number, minutes: number) =>
+    recipe(key, `Fill ${honey} ${size}`, [[empty, 1], [lid, 1], [labels, 1], [bulkCls, grams]], [[out, 1]], [['Sealing wax', 8]], [[L1, minutes]]);
+  // Maker of each class (the recipe that refills it) and the smallest batch run.
+  const makers = new Map<string, { rec: Recipe; min: number }>();
+  const maker = (rec: Recipe, min: number) => rec.outputs.forEach((o) => makers.set(o.classId, { rec, min }));
+  maker(fill('f5', 'Flower', '500g', flowerBulk, emptyJar5, f5, 500, 2), 24);
+  maker(fill('f1', 'Flower', '1kg', flowerBulk, emptyJar1, f1, 1000, 3), 12);
+  maker(fill('r5', 'Rosemary', '500g', rosemaryBulk, emptyJar5, r5, 500, 2), 24);
+  maker(fill('r1', 'Rosemary', '1kg', rosemaryBulk, emptyJar1, r1, 1000, 3), 12);
+  maker(fill('o5', 'Oak', '500g', oakBulk, emptyJar5, o5, 500, 2), 24);
+  maker(fill('o1', 'Oak', '1kg', oakBulk, emptyJar1, o1, 1000, 3), 12);
+  maker(fill('h5', 'Heather', '500g', heatherBulk, emptyJar5, h5, 500, 2), 24);
+  maker(fill('h1', 'Heather', '1kg', heatherBulk, emptyJar1, h1, 1000, 3), 12);
+  maker(recipe('box', 'Christmas box', [[f5, 1], [r1, 1], [giftBox, 1]], [[xmasBox, 1]], [['Ribbon', 60]], [[L2, 5]]), 6);
+  const deluxe = recipe('deluxe', 'Deluxe gift box', [[h5, 1], [candle, 1], [giftBox, 1]], [[xmasBox, 1]], [['Ribbon', 60]], [[L2, 6]]);
+  const candleL = recipe('candle-l', 'Make large candle', [[beeswax, 250], [wick, 30], [labels, 1]], [[candle, 1]], [['Electricity', 15]], [[L2, 20]]);
+  maker(candleL, 15);
+  recipe('candle-s', 'Make small candle', [[beeswax, 90], [wick, 20], [labels, 1]], [[candle, 1]], [['Electricity', 8]], [[L2, 8]]);
+  maker(recipe('butter', 'Make butter', [[rawMilk, 20], [butterPaper, 4]], [[butter, 4]], [['Salt', 30], ['Electricity', 30]], [[L2, 45]]), 3);
+  maker(recipe('kefir', 'Make kefir', [[rawMilk, 1], [kefirBottle, 2]], [[kefir, 2]], [['Cultures', 25]], [[L1, 6]]), 10);
+  maker(recipe('sausage', 'Make sausages', [[porkShoulder, 5000], [casing, 400]], [[sausages, 4500]], [['Spices', 600], ['Electricity', 40]], [[L3, 75]]), 1);
+  maker(recipe('eggs', 'Pack eggs', [[looseEggs, 12], [eggBox, 1]], [[eggs, 12]], [['Label', 5]], [[L1, 3]]), 10);
+  maker(recipe('cheese', 'Make cured cheese and whey', [[rawMilk, 10]], [[curedCheese, 1000], [whey, 8]], [['Rennet & salt', 150]], [[L3, 40]], [0.8, 0.2]), 6);
+  maker(recipe('fresh', 'Make fresh cheese', [[rawMilk, 2]], [[freshCheese, 1]], [['Salt', 5]], [[L1, 4]]), 12);
+  maker(recipe('bottle', 'Bottle milk', [[rawMilk, 1]], [[bottle, 1]], [['Bottle', 40]], [[L1, 1]]), 30);
+  maker(recipe('yogurt', 'Make yogurt', [[rawMilk, 1]], [[yogurt, 8]], [['Cultures', 20], ['Pots', 80]], [[L1, 10]]), 4);
+
+  // Bought classes: supplier, lot size and cost per base unit at the start (prices rise 5 % every 150 days).
+  const sources = new Map<string, { from: Supplier; lot: number; cost: number }>();
+  const source = (c: ProductClass, from: Supplier, lot: number, cost: number) => sources.set(c.id, { from, lot, cost });
+  source(flowerBulk, apicola, 40000, 650); source(rosemaryBulk, apicola, 30000, 800); source(oakBulk, apicola, 25000, 900); source(heatherBulk, apicola, 25000, 1000);
+  source(lavender, apicola, 24, 520); source(comb, apicola, 8000, 2000); source(pollen, apicola, 24, 250); source(propolis, apicola, 12, 600);
+  source(beeswax, apicola, 5000, 2200); source(wick, apicola, 1000, 90);
+  source(emptyJar5, envases, 200, 35); source(emptyJar1, envases, 120, 50); source(lid, envases, 300, 12); source(giftBox, envases, 30, 150);
+  source(butterPaper, envases, 100, 8); source(kefirBottle, envases, 100, 45); source(eggBox, envases, 100, 15); source(casing, envases, 2000, 150);
+  source(labels, imprenta, 500, 6); source(rawMilk, granja, 300, 45); source(looseEggs, granja, 360, 18);
+  source(chorizo, carnes, 30, 380); source(porkLoin, carnes, 10000, 700); source(minced, carnes, 10000, 850); source(steak, carnes, 6000, 1700);
+  source(lamb, carnes, 10000, 1600); source(porkShoulder, carnes, 20000, 600);
+  const costOn = (c: { cost: number }, days: number) => Math.round(c.cost * (1 + 0.05 * Math.floor((DEMO_DAYS - days) / 150)));
+
+  // ---------- simulation state ----------
+  const bal = new Map<string, number>();
+  const avg = new Map<string, number>();
+  const incoming = (id: string, amount: number, cost: number | null) => {
+    const b = Math.max(bal.get(id) ?? 0, 0); // a negative balance resets to 0 first (§4.3)
+    if (cost !== null) avg.set(id, avg.has(id) ? round4((b * avg.get(id)! + amount * cost) / (b + amount)) : cost);
+    bal.set(id, b + amount);
+  };
+  const outgoing = (id: string, amount: number) => bal.set(id, (bal.get(id) ?? 0) - amount);
+  const decimals = (id: string) => byId.get(id)!.unit.decimals;
+  const methods: PaymentMethod[] = ['cash', 'bizum', 'cash', 'other'];
 
   const orders: Order[] = [];
   const payments: Payment[] = [];
-  const methods: PaymentMethod[] = ['cash', 'bizum', 'cash', 'other'];
-  const pay = (clientId: string, orderId: string | null, date: IsoDate, amount: number, note = '', voided = false) =>
+  const stock: StockEvent[] = [];
+  const purchases: Purchase[] = [];
+  let day = DEMO_DAYS;
+  let date = start;
+  const n = { buy: 0, make: 0, order: 0, pay: 0, remove: 0 };
+
+  // Purchases of one day are gathered per supplier and written at the end of the day (at 06:00).
+  let basket = new Map<Supplier | null, PurchaseLine[]>();
+  const addLine = (from: Supplier | null, c: ProductClass, amount: number, lineTotal: number) => {
+    const lines = basket.get(from) ?? basket.set(from, []).get(from)!;
+    lines.push({ lineId: '', classId: c.id, className: fullName(c), unitName: c.unit.name, decimals: c.unit.decimals, amount, lineTotal });
+  };
+  const purchase = (from: Supplier | null, lines: PurchaseLine[], voided = false, note = '') => {
+    const id = `demo-purchase-${pad(purchases.length + 1)}`;
+    purchases.push({
+      ...stamp(at(date, 6, n.buy++)), id, date, supplierId: from?.id ?? null, supplierName: from?.name ?? '',
+      lines: lines.map((l, j) => ({ ...l, lineId: `${id}-l${j + 1}` })), total: lines.reduce((t, l) => t + l.lineTotal, 0),
+      method: methods[purchases.length % methods.length], note, voided,
+    });
+  };
+  const closeDay = () => {
+    for (const [from, lines] of basket) purchase(from, lines);
+    basket = new Map();
+  };
+  const buy = (c: ProductClass, amount: number) => {
+    const cost = costOn(sources.get(c.id)!, day);
+    incoming(c.id, amount, cost);
+    addLine(sources.get(c.id)!.from, c, amount, roundDiv(amount * cost, 10 ** c.unit.decimals));
+  };
+  const spend = (from: Supplier | null, c: ProductClass, cents: number) => addLine(from, c, 1, cents);
+
+  // Makes or buys what is missing so that `need` of the class is in stock and it stays above its low-stock level.
+  const ensure = (id: string, used: number) => {
+    const have = Math.max(bal.get(id) ?? 0, 0);
+    const need = used + (byId.get(id)!.lowStockThreshold ?? 0);
+    if ((bal.get(id) ?? 0) >= need) return;
+    const m = makers.get(id);
+    if (m) {
+      const per = m.rec.outputs.find((o) => o.classId === id)!.amount;
+      make(m.rec, Math.max(m.min, Math.ceil((need - have) / per)));
+    } else {
+      const lot = sources.get(id)!.lot;
+      buy(byId.get(id)!, Math.ceil((need - have) / lot) * lot);
+    }
+  };
+  // Runs a recipe `times` times with its cost snapshot; a voided run changes nothing.
+  function make(rec: Recipe, times: number, opts: { total?: number; voided?: boolean; note?: string } = {}) {
+    const scale = (xs: ClassAmount[]) => xs.map((x) => ({ ...x, amount: x.amount * times }));
+    const inputs = scale(rec.inputs);
+    const outputs = scale(rec.outputs);
+    if (!opts.voided) inputs.forEach((i) => ensure(i.classId, i.amount));
+    const materials = Math.round(inputs.reduce((s, i) => s + (i.amount / 10 ** decimals(i.classId)) * (avg.get(i.classId) ?? 0), 0));
+    const labour = labourCosts((rec.labour ?? []).map((l: LabourRow) => ({ ...l, minutes: l.minutes * times })), levelsById);
+    const extras = rec.extras.map((e) => ({ ...e, amount: e.amount * times }));
+    const shares: CostShare[] = rec.shares;
+    const costs = buildTransformCosts(opts.total === undefined
+      ? { mode: 'breakdown', materials, materialsComplete: true, labour, extras, outputs, shares }
+      : { mode: 'total', materials, materialsComplete: true, labour, extras: [], enteredTotal: opts.total, outputs, shares });
+    stock.push({
+      ...stamp(at(date, 7, n.make++)), id: `demo-stock-${pad(stock.length + 1)}`, date, type: 'transform', inputs, outputs, recipeId: rec.id,
+      costs, note: opts.note ?? '', voided: opts.voided ?? false,
+    });
+    if (opts.voided) return;
+    inputs.forEach((i) => outgoing(i.classId, i.amount));
+    for (const o of outputs) incoming(o.classId, o.amount, perBaseUnit(costs.total * costs.allocation.find((s) => s.classId === o.classId)!.share, o.amount, decimals(o.classId)));
+  }
+  const remove = (c: ProductClass, amount: number, reason: string, note = '') => {
+    if (amount <= 0) return;
+    if ((bal.get(c.id) ?? 0) < amount) ensure(c.id, amount);
+    outgoing(c.id, amount);
+    stock.push({
+      ...stamp(at(date, 18, n.remove++)), id: `demo-stock-${pad(stock.length + 1)}`, date, type: 'remove', classId: c.id, amount,
+      unitCost: null, reason, note, voided: false,
+    });
+  };
+
+  // ---------- clients and their orders ----------
+  const clients: Client[] = CLIENTS.map(([name, phone, tags]) => ({
+    ...made, id: `demo-client-${name.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z]+/g, '-')}`,
+    name, phone, notes: name === RENAMED.client ? `Was "${RENAMED.oldName}" until she married.` : '', tags, archived: name === ARCHIVED_CLIENT,
+  }));
+  // Order days per client: its own rhythm, more often in busy months.
+  const due = new Map<number, number[]>();
+  CLIENTS.forEach(([, , , from, to, step], ci) => {
+    for (let d = from; d >= to; ) {
+      (due.get(d) ?? due.set(d, []).get(d)!).push(ci);
+      const month = Number(ago(d).slice(5, 7)) - 1;
+      d -= Math.max(1, Math.round((step * (0.6 + 0.8 * r())) / SEASON[month]));
+    }
+  });
+  const unsettled = new Map<number, Order[]>(); // 'later' clients: orders not yet paid
+  const instalments = new Map<number, { order: Order; amount: number; note: string }[]>(); // payments due per day
+  const pay = (clientId: string, orderId: string | null, amount: number, hour: number, note = '', voided = false) => {
     payments.push({
-      ...base, id: `demo-pay-${String(payments.length + 1).padStart(2, '0')}`, date, clientId, orderId, amount,
+      ...stamp(at(date, hour, n.pay++)), id: `demo-pay-${pad(payments.length + 1)}`, date, clientId, orderId, amount,
       method: methods[payments.length % methods.length], note, voided,
     });
-  const later: Order[] = [];
+  };
+  let doubled = false;
+  let mistyped = false;
+  let oversold = false;
 
-  ORDERS.forEach(([days, ci, spec, status], i) => {
-    const id = `demo-order-${String(i + 1).padStart(2, '0')}`;
-    const lines = spec.split(' ').map((part, j): OrderLine => {
-      const [key, num] = part.split(':');
-      const { cls, v } = variants.get(key)!;
-      const fixed = v.kind === 'fixed';
-      const amount = fixed ? Number(num) * v.baseAmount! : Number(num);
-      return {
-        lineId: `${id}-l${j + 1}`, classId: cls.id, variantId: v.id, className: cls.name, variantLabel: v.label,
-        kind: v.kind, unitName: cls.unit.name, decimals: cls.unit.decimals, quantity: fixed ? Number(num) : null,
-        amount, unitPrice: v.price, unitCost: v.cost,
-        lineTotal: fixed ? Number(num) * v.price : roundDiv(amount * v.price, 10 ** cls.unit.decimals),
-      };
-    });
+  const lineFor = (key: string, ci: number, orderId: string, j: number): OrderLine => {
+    const { cls, v } = variants.get(key)!;
+    const restaurant = CLIENTS[ci][2].includes('restaurant');
+    const fixed = v.kind === 'fixed';
+    const quantity = fixed ? (1 + Math.floor(r() * 2)) * (restaurant ? 2 : 1) : null;
+    let amount = fixed ? quantity! * v.baseAmount! : (restaurant ? 1000 + 50 * Math.floor(r() * 40) : 300 + 50 * Math.floor(r() * 18));
+    // Honeycomb once sold beyond what is in stock: it goes negative until the next purchase (§4.3).
+    if (key === 'comb' && !oversold && day <= 210) {
+      oversold = true;
+      amount = Math.max(bal.get(cls.id) ?? 0, 0) + 600;
+    } else ensure(cls.id, amount);
+    outgoing(cls.id, amount);
+    let unitPrice = day > PRICE_RISE_DAYS ? Math.round((v.price * OLD_PRICE) / 10) * 10 : v.price;
+    if (restaurant && !fixed) unitPrice = Math.round(unitPrice * RESTAURANT_DISCOUNT);
+    return {
+      lineId: `${orderId}-l${j + 1}`, classId: cls.id, variantId: v.id, className: fullName(cls), variantLabel: v.label, kind: v.kind,
+      unitName: cls.unit.name, decimals: cls.unit.decimals, quantity, amount, unitPrice, unitCost: v.cost,
+      lineTotal: fixed ? quantity! * unitPrice : roundDiv(amount * unitPrice, 10 ** cls.unit.decimals),
+    };
+  };
+
+  const placeOrder = (ci: number) => {
+    const [, , , , , , pool, policy, gifts] = CLIENTS[ci];
     const client = clients[ci];
+    const month = Number(date.slice(5, 7));
+    const keys = pool.split(' ').filter((k) => UNTIL[k] === undefined || day > UNTIL[k]);
+    const picks = [...new Set(Array.from({ length: 1 + Math.floor(r() * 3) }, () => keys[Math.floor(r() * keys.length)]))];
+    const christmas = (month === 12 && Number(date.slice(8, 10)) <= 24) || (month === 11 && Number(date.slice(8, 10)) >= 15);
+    if (gifts && christmas && r() < 0.6) picks.push(r() < 0.5 ? 'box' : 'box2');
+    const id = `demo-order-${pad(orders.length + 1)}`;
+    const lines = picks.map((key, j) => {
+      if (key === 'box2') make(deluxe, 1); // made to order
+      return lineFor(key, ci, id, j);
+    });
+    const name = client.name === RENAMED.client && day > RENAMED.since ? RENAMED.oldName : client.name;
     const order: Order = {
-      ...base, id, date: ago(days), clientId: client.id, clientName: client.name, lines,
-      total: lines.reduce((s, l) => s + l.lineTotal, 0), note: '', voided: status === 'V',
-      voidReason: status === 'V' ? 'Entered twice' : null,
+      ...stamp(at(date, 10, 9 * n.order++)), id, date, clientId: client.id, clientName: name, lines,
+      total: lines.reduce((s, l) => s + l.lineTotal, 0), note: '', voided: false, voidReason: null,
     };
     orders.push(order);
-    if (status === 'P') pay(client.id, id, ago(Math.max(0, i % 3 === 0 ? days - 2 : days)), order.total);
-    if (status === 'H') pay(client.id, id, order.date, Math.max(100, Math.floor(order.total / 200) * 100));
-    if (status === 'V') pay(client.id, id, order.date, order.total, '', true);
-    if (status === 'L') later.push(order);
-  });
-  pay(clients[1].id, null, ago(28), later.reduce((s, o) => s + o.total, 0), 'Paid everything up to date');
-  pay(clients[5].id, null, ago(10), 2000, 'Advance');
-
-  let seq = 0;
-  const event = (days: number, rest: object) =>
-    ({ ...base, id: `demo-stock-${++seq}`, date: ago(days), note: '', voided: false, ...rest }) as StockEvent;
-  // Cost per base unit of every product: the jars' own cost, then the adds (materials of later transforms).
-  const unitCost = new Map<string, number>();
-  for (const { cls, v } of variants.values()) if (v.kind === 'fixed' && v.cost !== null) unitCost.set(cls.id, v.cost);
-  const stock: StockEvent[] = [];
-  const add = (days: number, cls: ProductClass, amount: number, cost: number) => {
-    unitCost.set(cls.id, cost);
-    stock.push(event(days, { type: 'add', classId: cls.id, amount, unitCost: cost, reason: '' }));
-  };
-  // Purchases are always paid at once; a tracked line feeds the class average cost like an add with a unit cost.
-  const purchases: Purchase[] = [];
-  const buy = (days: number, from: Supplier | null, lines: [ProductClass, number, number][], voided = false) => {
-    const rows = lines.map(([cls, amount, cost], j): PurchaseLine => {
-      if (cls.trackStock) unitCost.set(cls.id, cost);
-      return {
-        lineId: `demo-purchase-${purchases.length + 1}-l${j + 1}`, classId: cls.id, className: fullName(cls),
-        unitName: cls.unit.name, decimals: cls.unit.decimals, amount, lineTotal: roundDiv(amount * cost, 10 ** cls.unit.decimals),
-      };
+    const payNow = (amount: number) => payments.push({
+      ...stamp(at(date, 10, 9 * (n.order - 1) + 1)), id: `demo-pay-${pad(payments.length + 1)}`, date, clientId: client.id, orderId: id,
+      amount, method: methods[payments.length % methods.length], note: '', voided: false,
     });
-    purchases.push({
-      ...base, id: `demo-purchase-${purchases.length + 1}`, date: ago(days), supplierId: from?.id ?? null, supplierName: from?.name ?? '',
-      lines: rows, total: rows.reduce((t, l) => t + l.lineTotal, 0), method: methods[purchases.length % methods.length], note: voided ? 'Entered twice' : '', voided,
+    if (policy === 'now' && !(day <= 2 && r() < 0.5)) payNow(order.total);
+    if (policy === 'slow' && day > 120) payNow(order.total);
+    if (policy === 'later') (unsettled.get(ci) ?? unsettled.set(ci, []).get(ci)!).push(order);
+    if (policy === 'instal') {
+      if (order.total < 2000) payNow(order.total);
+      else {
+        const first = Math.floor(order.total / 200) * 100;
+        const second = Math.floor((order.total - first) / 200) * 100;
+        payNow(first);
+        const plan = second > 0 ? [[14, second], [30, order.total - first - second]] : [[14, order.total - first]];
+        for (const [later, amount] of plan) {
+          if (day - later < 0) continue;
+          (instalments.get(day - later) ?? instalments.set(day - later, []).get(day - later)!).push({ order, amount, note: 'Instalment' });
+        }
+      }
+    }
+    // Entered twice by mistake: a voided copy with its voided payment, stock untouched.
+    if (!doubled && ci === 0 && day <= 160) {
+      doubled = true;
+      const copyId = `demo-order-${pad(orders.length + 1)}`;
+      orders.push({
+        ...order, ...stamp(at(date, 10, 9 * n.order++)), id: copyId, lines: lines.map((l, j) => ({ ...l, lineId: `${copyId}-l${j + 1}` })),
+        voided: true, voidReason: 'Entered twice',
+      });
+      pay(client.id, copyId, order.total, 10, '', true);
+    }
+  };
+
+  // Running costs: weekly market fee, monthly bills, seasonal and one-off costs.
+  const bills = () => {
+    const dom = Number(date.slice(8, 10));
+    const month = Number(date.slice(5, 7));
+    if (new Date(`${date}T00:00:00Z`).getUTCDay() === 6) spend(null, marketFee, 2500);
+    if (dom === 1) spend(null, stallRent, 5000);
+    if (dom === 1 || dom === 15) spend(gasolinera, fuel, 4000 + Math.floor(r() * 7) * 100);
+    if (dom === 5) spend(iberluz, electricity, [9800, 9400, 8200, 7000, 6400, 6800, 7600, 8000, 6900, 7300, 8600, 9900][month - 1]);
+    if (dom === 10) spend(null, phone, 2900);
+    if (dom === 20) spend(piensos, feed, 11000 + Math.floor(r() * 30) * 100);
+    if (dom === 12 && month % 2 === 0) spend(envases, transport, 1800 + Math.floor(r() * 6) * 100);
+    if (dom === 15 && (month === 3 || month === 9)) spend(apicola, hiveTreatment, 6000);
+    if (dom === 25 && month % 3 === 1) spend(clinica, vet, 4500);
+    if (dom === 10 && month === 1) spend(seguros, insurance, 95000);
+    if (dom === 10 && month === 7) spend(seguros, insurance, 22000);
+  };
+
+  // ---------- the days ----------
+  for (day = DEMO_DAYS; day >= 0; day--) {
+    date = ago(day);
+    n.buy = n.make = n.order = n.pay = n.remove = 0;
+    bills();
+    if (day === 230) {
+      // A new honey extractor; the first entry was typed twice and voided.
+      purchase(apicola, [{ lineId: '', classId: equipment.id, className: fullName(equipment), unitName: 'pcs', decimals: 0, amount: 1, lineTotal: 145000 }], true, 'Entered twice');
+      spend(apicola, equipment, 145000);
+    }
+    if (day === 250) make(makers.get(f5.id)!.rec, 10, { voided: true, note: 'Wrong recipe' });
+    if (day === 150) make(candleL, 15, { total: 9000, note: 'Costs from the invoice total' });
+    for (const ci of due.get(day) ?? []) placeOrder(ci);
+    for (const { order, amount, note } of instalments.get(day) ?? []) pay(order.clientId, order.id, amount, 19, note);
+    // 'later' clients pay what they owe for orders older than a week, every 30 days.
+    for (const [ci, list] of unsettled) {
+      if ((CLIENTS[ci][3] - day) % 30 !== 29) continue;
+      const settle = list.filter((o) => o.date <= ago(day + 7));
+      const amount = settle.reduce((s, o) => s + o.total, 0);
+      if (!amount) continue;
+      if (!mistyped && ci === 1) {
+        mistyped = true;
+        pay(clients[ci].id, null, amount * 10, 19, 'Typed one zero too many', true);
+      }
+      pay(clients[ci].id, null, amount, 19, 'Monthly payment');
+      unsettled.set(ci, list.filter((o) => !settle.includes(o)));
+    }
+    // 'credit' clients pay an advance every 45 days.
+    CLIENTS.forEach(([, , , from, , , , policy], ci) => {
+      if (policy === 'credit' && day <= from && (from - day) % 45 === 0) pay(clients[ci].id, null, 7000, 9, 'Advance');
     });
-  };
-  const recipes: Recipe[] = [];
-  const recipe = (key: string, name: string, inputs: [ProductClass, number][], out: ProductClass, extras: [string, number][], outAmount = 1, labour?: LabourRow[]) => {
-    const r: Recipe = {
-      ...base, id: `demo-recipe-${key}`, name, inputs: inputs.map(([c, amount]) => ({ classId: c.id, amount })),
-      outputs: [{ classId: out.id, amount: outAmount }], extras: extras.map(([label, amount]) => ({ label, amount })),
-      shares: [{ classId: out.id, share: 1 }], ...(labour ? { labour } : {}), archived: false,
-    };
-    recipes.push(r);
-    return r;
-  };
-  // Runs recipe `r` `times` times (breakdown costs: materials plus the scaled extras).
-  const make = (days: number, r: Recipe, times: number) => {
-    const inputs = r.inputs.map((i) => ({ ...i, amount: i.amount * times }));
-    const decimals = (id: string) => products.find((p) => p.id === id)!.unit.decimals;
-    const materials = Math.round(inputs.reduce((s, i) => s + (i.amount / 10 ** decimals(i.classId)) * unitCost.get(i.classId)!, 0));
-    const extras = r.extras.map((e) => ({ ...e, amount: e.amount * times }));
-    const outputs = r.outputs.map((o) => ({ ...o, amount: o.amount * times }));
-    const labour = r.labour && labourCosts(r.labour.map((l) => ({ ...l, minutes: l.minutes * times })), levelsById);
-    stock.push(event(days, {
-      type: 'transform', inputs, outputs, recipeId: r.id,
-      costs: buildTransformCosts({ mode: 'breakdown', materials, materialsComplete: true, labour, extras, outputs, shares: r.shares }),
-    }));
-  };
-  const fill = (key: string, honey: string, size: string, bulkCls: ProductClass, empty: ProductClass, out: ProductClass, kg: number, time: number) =>
-    recipe(key, `Fill ${honey} ${size}`, [[empty, 1], [lid, 1], [bulkCls, kg]], out, [['Labels', 10]], 1, [{ levelId: 'demo-level-1', minutes: time / 20 }]);
-  const fillF5 = fill('f5', 'Flower', '500g', flowerBulk, emptyJar5, f5, 500, 40);
-  const fillF1 = fill('f1', 'Flower', '1kg', flowerBulk, emptyJar1, f1, 1000, 60);
-  const fillR5 = fill('r5', 'Rosemary', '500g', rosemaryBulk, emptyJar5, r5, 500, 40);
-  const fillR1 = fill('r1', 'Rosemary', '1kg', rosemaryBulk, emptyJar1, r1, 1000, 60);
-  const fillO5 = fill('o5', 'Oak', '500g', oakBulk, emptyJar5, o5, 500, 40);
-  const fillO1 = fill('o1', 'Oak', '1kg', oakBulk, emptyJar1, o1, 1000, 60);
-  const boxRecipe = recipe('box', 'Christmas box', [[f5, 1], [r1, 1], [giftBox, 1]], xmasBox, [['Time', 100]]);
-
-  const L1 = { levelId: 'demo-level-1' }, L2 = { levelId: 'demo-level-2' }, L3 = { levelId: 'demo-level-3' };
-  const fillH5 = recipe('h5', 'Fill Heather 500g', [[emptyJar5, 1], [lid, 1], [labels, 1], [heatherBulk, 500]], h5, [['Sealing wax', 8]], 1, [{ ...L1, minutes: 2 }]);
-  const fillH1 = recipe('h1', 'Fill Heather 1kg', [[emptyJar1, 1], [lid, 1], [labels, 1], [heatherBulk, 1000]], h1, [['Sealing wax', 8]], 1, [{ ...L1, minutes: 3 }]);
-  const candleL = recipe('candle-l', 'Make large candle', [[beeswax, 250], [wick, 30], [labels, 1]], candle, [['Electricity', 15]], 1, [{ ...L2, minutes: 20 }]);
-  const candleS = recipe('candle-s', 'Make small candle', [[beeswax, 90], [wick, 20], [labels, 1]], candle, [['Electricity', 8]], 1, [{ ...L2, minutes: 8 }]);
-  const butterRecipe = recipe('butter', 'Make butter', [[rawMilk, 20], [butterPaper, 4]], butter, [['Salt', 30], ['Electricity', 30]], 4, [{ ...L2, minutes: 45 }]);
-  const kefirRecipe = recipe('kefir', 'Make kefir', [[rawMilk, 1], [kefirBottle, 2]], kefir, [['Cultures', 25]], 2, [{ ...L1, minutes: 6 }]);
-  const sausageRecipe = recipe('sausage', 'Make sausages', [[porkShoulder, 5000], [casing, 40]], sausages, [['Spices', 600], ['Electricity', 40]], 4500, [{ ...L3, minutes: 75 }]);
-  const packEggs = recipe('eggs', 'Pack eggs', [[looseEggs, 12], [eggBox, 1]], eggs, [['Label', 5]], 12, [{ ...L1, minutes: 3 }]);
-  const deluxeBox = recipe('deluxe', 'Deluxe gift box', [[h5, 1], [candle, 1], [giftBox, 1]], xmasBox, [['Ribbon', 60]], 1, [{ ...L2, minutes: 6 }]);
-
-  buy(125, apicola, [[flowerBulk, 60000, 650], [rosemaryBulk, 40000, 800], [oakBulk, 25000, 900]]);
-  buy(125, envases, [[emptyJar5, 200, 35], [emptyJar1, 120, 50], [lid, 320, 12], [giftBox, 20, 150]]);
-  add(125, pollen, 48, 250); add(125, comb, 14000, 2000);
-  make(122, fillF5, 40); make(122, fillF1, 20);
-  make(121, fillR5, 30); make(121, fillR1, 25);
-  make(100, fillO5, 20); make(100, fillO1, 10);
-  buy(80, apicola, [[rosemaryBulk, 10000, 820]]);
-  buy(75, apicola, [[flowerBulk, 20000, 680]]);
-  make(65, fillF5, 30);
-  stock.push(event(60, { type: 'remove', classId: f5.id, amount: 3, unitCost: null, reason: 'broken' }));
-  make(55, fillR5, 16);
-  make(48, boxRecipe, 10);
-
-  // Dairy made from raw milk; meat bought in.
-  const cheeseRecipe = recipe('cheese', 'Make cured cheese', [[rawMilk, 10]], curedCheese, [['Rennet & salt', 150], ['Time', 300]], 1000);
-  const freshRecipe = recipe('fresh', 'Make fresh cheese', [[rawMilk, 2]], freshCheese, [['Time', 30]]);
-  const bottleRecipe = recipe('bottle', 'Bottle milk', [[rawMilk, 1]], bottle, [['Bottle', 40]]);
-  const yogurtRecipe = recipe('yogurt', 'Make yogurt', [[rawMilk, 1]], yogurt, [['Cultures', 20], ['Pots', 80]], 8);
-  add(125, rawMilk, 800, 45); add(125, chorizo, 40, 380);
-  make(120, cheeseRecipe, 20); make(119, freshRecipe, 30); make(118, bottleRecipe, 60); make(118, yogurtRecipe, 20);
-  add(110, porkLoin, 15000, 700); add(110, minced, 12000, 850);
-  add(60, rawMilk, 400, 45);
-  make(58, bottleRecipe, 40); make(57, freshRecipe, 20); make(56, yogurtRecipe, 10);
-  add(40, steak, 8000, 1700);
-
-  // Candles, heather honey, butter, kefir, sausages, lamb and eggs.
-  buy(127, apicola, [[heatherBulk, 30000, 1000], [beeswax, 10000, 2200], [wick, 2000, 90]]);
-  buy(127, imprenta, [[labels, 300, 6]]);
-  buy(126, envases, [[eggBox, 150, 15], [butterPaper, 100, 8], [kefirBottle, 200, 45], [casing, 400, 150]]);
-  add(126, looseEggs, 1000, 18); add(126, porkShoulder, 20000, 600); add(126, lamb, 16000, 1600); add(126, propolis, 24, 600);
-  add(100, rawMilk, 600, 45);
-  make(112, packEggs, 30);
-  make(108, butterRecipe, 10); make(106, kefirRecipe, 30); make(104, sausageRecipe, 4);
-  make(102, candleL, 20); make(102, candleS, 30);
-  buy(101, envases, [[emptyJar5, 100, 36], [lid, 150, 13]]);
-  make(100, fillH5, 30); make(100, fillH1, 14);
-  buy(72, apicola, [[heatherBulk, 10000, 1050], [beeswax, 5000, 2300], [wick, 1000, 95]]);
-  buy(72, imprenta, [[labels, 200, 7]]);
-  buy(72, envases, [[eggBox, 100, 15], [butterPaper, 60, 8], [giftBox, 20, 150]]);
-  add(70, looseEggs, 600, 20);
-  make(68, packEggs, 20);
-  add(62, porkShoulder, 15000, 620);
-  make(58, sausageRecipe, 3);
-  make(55, butterRecipe, 8);
-  add(50, propolis, 12, 600); add(48, lamb, 12000, 1650);
-  make(45, candleL, 12); make(45, candleS, 20);
-  make(40, fillH5, 20);
-  make(36, kefirRecipe, 15);
-  make(33, deluxeBox, 8);
-  make(28, packEggs, 20);
-  make(14, butterRecipe, 6); make(12, packEggs, 12); make(8, kefirRecipe, 15);
-
-  // Running costs over the demo months: fuel twice a month, a weekly market fee, monthly bills, a few one-offs.
-  for (let d = 115; d >= 10; d -= 15) buy(d, gasolinera, [[fuel, 1, 4000]]);
-  for (let d = 119; d >= 0; d -= 7) buy(d, null, [[marketFee, 1, 2500]]);
-  buy(90, apicola, [[hiveTreatment, 1, 6000]]);
-  [118, 88, 58, 28].forEach((d, i) => buy(d, iberluz, [[electricity, 1, [8450, 9120, 7890, 9340][i]]]));
-  [115, 85, 55, 25].forEach((d) => buy(d, null, [[stallRent, 1, 5000]]));
-  [110, 80, 50, 20].forEach((d) => buy(d, null, [[phone, 1, 2900]]));
-  [120, 95, 70, 45, 20].forEach((d, i) => buy(d, piensos, [[feed, 1, [15000, 16200, 14800, 15500, 16000][i]]]));
-  [125, 90, 55].forEach((d, i) => buy(d, envases, [[transport, 1, [1800, 2200, 1950][i]]]));
-  buy(100, clinica, [[vet, 1, 4500]]); buy(40, clinica, [[vet, 1, 12000]]);
-  buy(95, seguros, [[insurance, 1, 38000]]); buy(20, seguros, [[insurance, 1, 14500]]);
-  buy(105, apicola, [[equipment, 1, 4500]]);
-  buy(33, apicola, [[equipment, 1, 18500]], true); buy(32, apicola, [[equipment, 1, 18500]]);
-  buy(60, piensos, [[feed, 1, 7000], [equipment, 1, 2400]]);
+    // Stock removes for every reason.
+    if (day === 380) remove(f5, 2, 'waste', 'Two jars broke at the market');
+    if (day === 300) remove(pollen, 1, 'gift');
+    if (day === 200) remove(bottle, 3, 'own use');
+    if (day === 120) remove(candle, 1, 'Market sample');
+    if (day === 90) remove(lid, 5, 'count correction');
+    if (day === 0) {
+      // Today ends with propolis sold out (stock count) and the rosemary 1kg jar low after breakage.
+      remove(propolis, bal.get(propolis.id)!, 'count correction', 'Shelf count');
+      remove(r1, (bal.get(r1.id) ?? 0) - 3, 'waste', 'Broken in transport');
+    }
+    closeDay();
+  }
 
   const as = (type: RecordType, records: object[]) => records.map((record) => ({ type, record }));
   return [
