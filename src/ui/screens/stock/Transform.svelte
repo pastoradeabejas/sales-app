@@ -5,7 +5,7 @@
   import Header from '../../components/Header.svelte';
   import Icon from '../../components/Icon.svelte';
   import Segmented from '../../components/Segmented.svelte';
-  import { averageCostAt, materialsCost, otherDifference, outputUnitCosts } from '../../../core/costs.ts';
+  import { averageCostAt, labourAmount, labourCosts, materialsCost, otherDifference, outputUnitCosts } from '../../../core/costs.ts';
   import { formatMoney, formatUnitCost } from '../../../core/money.ts';
   import { formatAmount, parseAmount } from '../../../core/quantity.ts';
   import { batch, parseBatches } from '../../../core/recipes.ts';
@@ -15,6 +15,7 @@
   import { liveName } from './grouping.ts';
   import { go } from '../../router.svelte.ts';
   import { showToast } from '../../toast.svelte.ts';
+  import { labourRows } from '../settings/levels.ts';
   import RecipeSheet from './RecipeSheet.svelte';
   import {
     cap,
@@ -47,6 +48,7 @@
   let date = $state(localDate());
   let note = $state('');
   let form = $state<CostForm>({ opened: false, mode: 'breakdown', extras: [], totalText: '', shareTexts: ['100'] });
+  let labourTexts = $state<{ levelId: string; text: string }[]>([]);
   let tried = $state(false);
   let confirm = $state(false);
   let newOpen = $state(false);
@@ -56,13 +58,14 @@
   const planned = $derived(recipe && batches ? batch(recipe, batches) : null);
   const centsText = (c: number) => (c / 100).toFixed(2);
 
-  // Outputs and cost extras follow the recipe and batches; hand corrections stay until either changes.
+  // Outputs, labour and cost extras follow the recipe and batches; hand corrections stay until either changes.
   function reset() {
     const r = app.recipes.find((x) => x.id === recipeId && !x.archived);
     const n = parseBatches(batchesText);
     if (!r || !n) return;
     const p = batch(r, n);
     outTexts = p.outputs.map((o) => toInputText(o.amount, decimalsOf(o.classId)));
+    labourTexts = (p.labour ?? []).map((l) => ({ levelId: l.levelId, text: String(l.minutes) }));
     const shares = r.shares.length === r.outputs.length ? sharesToPercents(r.shares) : equalPercents(r.outputs.length);
     form = { ...form, extras: p.extras.map((x) => ({ label: x.label, text: centsText(x.amount) })), shareTexts: shares };
   }
@@ -103,7 +106,10 @@
     return averageCostAt(c, app.orders, app.stock, view.classesById, { date, createdAt: '~' }, app.purchases);
   }
   const mat = $derived(materialsCost(ins.filter((x) => x.amount > 0), avgCostAt, view.classesById));
-  const costResult = $derived(costsFromForm(form, mat, outs.filter((x) => x.amount > 0)));
+  const lab = $derived(labourRows(labourTexts));
+  const labour = $derived(labourCosts(lab.rows, view.levelsById));
+  const labourOf = (levelId: string) => view.levelsById.get(levelId);
+  const costResult = $derived(costsFromForm(form, mat, outs.filter((x) => x.amount > 0), labour));
   const unitCosts = $derived(costResult.costs ? outputUnitCosts(costResult.costs, outs.filter((x) => x.amount > 0), view.classesById) : []);
   const shareSum = $derived(form.shareTexts.reduce((s, t) => s + (Number(t.replace(',', '.')) || 0), 0));
 
@@ -111,6 +117,7 @@
     if (!recipe) return ['Choose a recipe.'];
     if (!batches) return ['Batches must be a whole number from 1.'];
     if (outAmounts.some((a) => a === null)) return ['Check the amounts made.'];
+    if (lab.error) return [lab.error];
     return [
       ...validateTransform({ inputs: ins, outputs: outs }, view.classesById).map((e) => `${cap(e)}.`),
       ...(costResult.error ? [costResult.error] : []),
@@ -234,6 +241,24 @@
           </div>
         </div>
 
+        {#if labourTexts.length}
+          <div class="field">
+            <span class="label">Labour</span>
+            {#each labourTexts as x, i (x.levelId)}
+              {@const level = labourOf(x.levelId)}
+              {@const mins = lab.rows.find((r) => r.levelId === x.levelId)?.minutes}
+              <div class="labour">
+                <span class="grow">{level?.name ?? 'Unknown level'}</span>
+                <div class="suffix">
+                  <input class="input" inputmode="numeric" autocomplete="off" aria-label="Labour {i + 1} minutes" bind:value={x.text} />
+                  <span aria-hidden="true">min</span>
+                </div>
+                <b>{level && mins ? formatMoney(labourAmount(mins, level.hourlyRate)) : '—'}</b>
+              </div>
+            {/each}
+          </div>
+        {/if}
+
         {#if form.mode === 'breakdown'}
           {#each form.extras as x, i (i)}
             <div class="extra">
@@ -243,7 +268,7 @@
             </div>
           {/each}
           <div class="chips" role="group" aria-label="Add extra">
-            {#each ['Electricity', 'Time', 'Other'] as label (label)}
+            {#each ['Electricity', 'Other'] as label (label)}
               <button type="button" onclick={() => form.extras.push({ label: label === 'Other' ? '' : label, text: '' })}>+ {label}</button>
             {/each}
           </div>
@@ -452,6 +477,15 @@
     display: grid;
     grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) var(--tap);
     gap: 8px;
+  }
+  .labour {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 110px 70px;
+    align-items: center;
+    gap: 8px;
+  }
+  .labour b {
+    text-align: right;
   }
   .share {
     display: flex;
